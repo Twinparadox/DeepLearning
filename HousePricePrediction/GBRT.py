@@ -7,94 +7,121 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
-np.random.seed(123)
+scaler = MinMaxScaler(feature_range=(0, 1))
 
-# load data, return pandas format ts and array ts, ts is formatted as a column
-def load_data(filename, multiVariate=False):
 
-    df = pd.read_csv(filename)
-    df = df.fillna(0)
-    if multiVariate:
-        ts = df
-        data = ts.values[:, 1:].astype("float32")  # (N, 1)
-        print("time series shape:", data.shape)
+def splitTrainTest(data, train_period, test_period, multiVariate=False, gtruthName='SPI'):
+    if not multiVariate:
+        train = data[[gtruthName]].loc[:train_period - 1]
+        test = data[[gtruthName]].loc[train_period - lookBack:]
     else:
-        ts = df['SPI']
-        data = ts.values.reshape(-1, 1).astype("float32")
-        print("time series shape:", data.shape)
-    return ts, data
+        train = data.loc[:train_period - 1]
+        test = data.loc[train_period - lookBack:]
 
-def createSamples(dataset, lookBack, RNN=True, multiVariate=False):
+    train_sc = scaler.fit_transform(train)
+    test_sc = scaler.fit_transform(test)
 
-    dataX, dataY = [], []
-    for i in range(len(dataset) - lookBack):
-        sample_X = dataset[i:(i + lookBack), :]
-        sample_Y = dataset[i + lookBack, 0]
-        dataX.append(sample_X[0])
-        dataY.append(sample_Y)
-    dataX = np.array(dataX)  # (N, lag, variate)
-    print(dataX.shape)
-    dataY = np.array(dataY)  # (N, variate)
-    return dataX, dataY
+    return train, test, train_sc, test_sc
 
-# divide training and testing, default as 3:1
-def divideTrainTest(dataset, rate=0.75):
 
-    train_size = 128
-    test_size = 12
-    train, test = dataset[0:train_size], dataset[train_size:]
-    return train, test
+def makeSlidingWindows(origin_train, origin_test, train, test, lookBack=2, multiVariate=False, gtruthName='SPI'):
+    train_df = pd.DataFrame(train, index=origin_train.index)
+    test_df = pd.DataFrame(test, index=origin_test.index)
+
+    train_df.columns = origin_train.columns
+    test_df.columns = origin_test.columns
+
+    if not multiVariate:
+        column_list = list(train_df)
+        for s in range(1, lookBack + 1):
+            tmp_train = train_df[column_list].shift(s)
+            tmp_test = test_df[column_list].shift(s)
+
+            tmp_train.columns = "shift_" + tmp_train.columns + "_" + str(s)
+            tmp_test.columns = "shift_" + tmp_test.columns + "_" + str(s)
+
+            train_df[tmp_train.columns] = train_df[column_list].shift(s)
+            test_df[tmp_test.columns] = test_df[column_list].shift(s)
+
+        return train_df, test_df
+
+    else:
+        column_list = list(train_df)
+
+        for s in range(1, lookBack + 1):
+            tmp_train = train_df[column_list].shift(s)
+            tmp_test = test_df[column_list].shift(s)
+
+            tmp_train.columns = "shift_" + tmp_train.columns + "_" + str(s)
+            tmp_test.columns = "shift_" + tmp_test.columns + "_" + str(s)
+
+            train_df[tmp_train.columns] = train_df[column_list].shift(s)
+            test_df[tmp_test.columns] = test_df[column_list].shift(s)
+
+        return train_df, test_df
+
+
+def plot():
+    pass
+
 
 if __name__ == "__main__":
-    lookBack = 1
+    lookBack = 4
+    multiVariate = False
+    train_period1 = 128
+    test_period1 = 12
+    train_period2 = 32
+    test_period1 = 12
 
-    ts, data = load_data("./data/houseprice.csv", multiVariate=False)
-    # normalize time series
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    dataset = scaler.fit_transform(data)
+    df = pd.read_csv('./data/houseprice.csv')
+    data = df[['SPI', 'CPI', 'M2', 'MMI', 'CBD']]
+    column_list = list(data)
 
-    # divide the series into training/testing samples
-    # NOTE: Not RNN format
-    train, test = divideTrainTest(dataset)
+    train1, test1, train1_sc, test1_sc = splitTrainTest(data=data,
+                                                        train_period=train_period1,
+                                                        test_period=test_period1)
+    train1_df, test1_df = makeSlidingWindows(origin_train=train1,
+                                             origin_test=test1,
+                                             train=train1_sc,
+                                             test=test1_sc,
+                                             lookBack=lookBack)
 
-    trainX, trainY = createSamples(train, lookBack, RNN=False)
-    testX, testY = createSamples(test, lookBack, RNN=False)
-    print("trainX shape is", trainX.shape)
-    print("trainY shape is", trainY.shape)
-    print("testX shape is", testX.shape)
-    print("testY shape is", testY.shape)
+    X_train1 = train1_df.dropna().drop('SPI', axis=1).values
+    Y_train1 = train1_df.dropna()[['SPI']].values
 
-    pipe_model = Pipeline([('scl', StandardScaler()), ('clf', GradientBoostingRegressor())])
-    n_estimators = [100, 200, 300, 400, 500]
-    max_features = ['auto', 'sqrt', 'log2']
-    max_depths = [4,5,6,7,8]
+    X_test1 = test1_df.dropna().drop('SPI', axis=1).values
+    Y_test1 = test1_df.dropna()[['SPI']].values
+
+    pipe_model = Pipeline([('scl', MinMaxScaler(feature_range=(0, 1))), ('clf', GradientBoostingRegressor())])
+    n_estimators = [100,200,300,400,500]
+    max_features = ['auto','sqrt','log2']
+    max_depths = [3,4,5,6,7]
     criterions = ['friedman_mse', 'mse', 'mae']
     param_grid = [{'clf__n_estimators': n_estimators,
                    'clf__max_depth': max_depths,
-                   'clf__criterion': criterions,
-                   'clf__max_features': max_features}]
+                   'clf__max_features': max_features,
+                   'clf__criterion': criterions}]
     gs = GridSearchCV(estimator=pipe_model, param_grid=param_grid,
                       scoring='neg_mean_absolute_error', cv=5, iid=True, n_jobs=-1)
-    gs = gs.fit(trainX, trainY)
+    gs = gs.fit(X_train1, Y_train1)
     print(gs.best_score_)
     print(gs.best_params_)
 
     best_params = gs.best_params_
     best_model = gs.best_estimator_
 
-    # Period 1, Normal
-    Y_pred = best_model.predict(testX)
-    MAE = mean_absolute_error(testY, Y_pred)
-    print("Period 1(2016.09~2017.08) test MAE", MAE)
-    RMSE = np.sqrt(mean_squared_error(testY, Y_pred))
-    print("Period 1(2016.09~2017.08) test RMSE", RMSE)
+    Y_pred = best_model.predict(X_test1)
 
-    # Period 2, Lehman Bros
-    testX2 = trainX[33:45]
-    testY2 = trainY[33:45]
-    Y2_pred = best_model.predict(testX2)
-    MAE = mean_absolute_error(testY2, Y2_pred)
-    print("Period 1(2008.09~2009.08) test MAE", MAE)
-    RMSE = np.sqrt(mean_squared_error(testY2, Y2_pred))
-    print("Period 1(2008.09~2009.08) test RMSE", RMSE)
+    Y_test1 = scaler.inverse_transform(Y_test1.reshape(-1, 1))
+    Y_pred = scaler.inverse_transform(Y_pred.reshape(-1, 1))
+
+    MAE = mean_absolute_error(Y_test1, Y_pred)
+    print("test MAE", MAE)
+    RMSE = np.sqrt(mean_squared_error(Y_test1, Y_pred))
+    print("test RMSE", RMSE)
+
+    plt.plot(Y_pred, 'g')
+    plt.plot(Y_test1, 'r')
+    plt.show()

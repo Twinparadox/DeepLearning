@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-scaler = StandardScaler()
+scaler = MinMaxScaler(feature_range=(0, 1))
 
 
 def splitTrainTest(data, train_period, test_period, multiVariate=False, gtruthName='SPI'):
@@ -69,7 +69,7 @@ def plot():
 
 if __name__ == "__main__":
     lookBack = 4
-    multiVariate = False
+    multiVariate = True
     train_period1 = 128
     test_period1 = 12
     train_period2 = 32
@@ -98,7 +98,7 @@ if __name__ == "__main__":
     n_estimators = [100,200,300,400,500]
     max_features = ['auto','sqrt','log2']
     max_depths = [3,4,5,6,7]
-    criterions = ['mse', 'mae']
+    criterions = ['friedman_mse', 'mse', 'mae']
     param_grid = [{'clf__n_estimators': n_estimators,
                    'clf__max_depth': max_depths,
                    'clf__max_features': max_features,
