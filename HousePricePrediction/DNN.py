@@ -1,12 +1,15 @@
-from sklearn.model_selection import GridSearchCV
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.svm import SVR
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
+from keras.layers import LSTM
+from keras.layers import Dense
+from keras.layers import Flatten
+from keras.models import Sequential
+import keras.backend as K
+from keras.callbacks import ModelCheckpoint
 import numpy as np
 import pandas as pd
+import os
 import matplotlib.pyplot as plt
 
 scaler = StandardScaler()
@@ -60,7 +63,9 @@ def makeSlidingWindows(origin_train, origin_test, train, test, lookBack=2, multi
             test_df[tmp_test.columns] = test_df[column_list].shift(s)
 
         return train_df, test_df
-        
+        return train_df, test_df
+
+
 def evaluate(pred, gtruth, n_features):
     tmp_pred = np.zeros(shape=(len(pred),n_features))
     tmp_gtruth = np.zeros(shape=(len(gtruth),n_features))
@@ -77,11 +82,9 @@ def evaluate(pred, gtruth, n_features):
     print("test RMSE", RMSE)
 
 
-def plot(pred, gtruth, n_features, multiVariate=False):
+def plot(pred, gtruth, n_features):
     tmp_pred = np.zeros(shape=(len(pred),n_features))
     tmp_gtruth = np.zeros(shape=(len(gtruth),n_features))
-    
-    pred = pred.reshape(-1,1)
     
     tmp_pred[:,0] = pred[:,0]
     tmp_gtruth[:,0] = gtruth[:,0]
@@ -96,11 +99,15 @@ def plot(pred, gtruth, n_features, multiVariate=False):
 
 if __name__ == "__main__":
     lookBack = 4
-    multiVariate = False
+    multiVariate = True
+    n_features = 1
     train_period1 = 128
     test_period1 = 12
     train_period2 = 32
-    test_period2 = 12
+    test_period1 = 12
+
+    epochs = 100
+    n_units = [20, 50, 100, 150, 200]
 
     df = pd.read_csv('./data/houseprice.csv')
     data = df[['SPI', 'CPI', 'M2', 'MMI', 'CBD']]
@@ -118,85 +125,94 @@ if __name__ == "__main__":
                                              multiVariate=multiVariate)
 
     X_train1 = train1_df.dropna().drop('SPI', axis=1).values 
-    Y_train1 = train1_df.dropna()[['SPI']].values
+    X_test1 = test1_df.dropna().drop('SPI', axis=1).values
 
     if not multiVariate:
         n_features = 1
 
     else:           
+        X_train1 = train1_df.dropna().drop(column_list, axis=1).values 
+        X_test1 = test1_df.dropna().drop(column_list, axis=1).values
         n_features = len(column_list)        
         
-    X_test1 = test1_df.dropna().drop('SPI', axis=1).values
+    Y_train1 = train1_df.dropna()[['SPI']].values
     Y_test1 = test1_df.dropna()[['SPI']].values
+
+    X_train1 = X_train1.reshape(X_train1.shape[0], lookBack, n_features)
+    X_test1 = X_test1.reshape(X_test1.shape[0], lookBack, n_features)
     
-    train2, test2, train2_sc, test2_sc = splitTrainTest(data=data,
-                                                        train_period=train_period2,
-                                                        test_period=test_period2,
+    column_list = list(data)
+    train1, test1, train1_sc, test1_sc = splitTrainTest(data=data,
+                                                        train_period=train_period1,
+                                                        test_period=test_period1,
                                                         multiVariate=multiVariate)
-    train2_df, test2_df = makeSlidingWindows(origin_train=train2,
-                                             origin_test=test2,
-                                             train=train2_sc,
-                                             test=test2_sc,
+    train1_df, test1_df = makeSlidingWindows(origin_train=train1,
+                                             origin_test=test1,
+                                             train=train1_sc,
+                                             test=test1_sc,
                                              lookBack=lookBack,
                                              multiVariate=multiVariate)
 
-    X_train2 = train2_df.dropna().drop('SPI', axis=1).values
-    Y_train2 = train2_df.dropna()[['SPI']].values
+    X_train1 = train1_df.dropna().drop('SPI', axis=1).values 
+    X_test1 = test1_df.dropna().drop('SPI', axis=1).values
 
     if not multiVariate:
         n_features = 1
 
     else:           
+        X_train1 = train1_df.dropna().drop(column_list, axis=1).values 
+        X_test1 = test1_df.dropna().drop(column_list, axis=1).values
         n_features = len(column_list)        
+        
+    Y_train1 = train1_df.dropna()[['SPI']].values
+    Y_test1 = test1_df.dropna()[['SPI']].values
 
-    X_test2 = test2_df.dropna().drop('SPI', axis=1).values
-    Y_test2 = test2_df.dropna()[['SPI']].values 
-    
+    X_train1 = X_train1.reshape(X_train1.shape[0], lookBack, n_features)
+    X_test1 = X_test1.reshape(X_test1.shape[0], lookBack, n_features)
 
-    pipe_model = Pipeline([('scl', StandardScaler()), ('clf', SVR())])
-    param_range = [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0]
-    param_range2 = [0.0001, 0.001, 0.01, 0.1]
-    param_grid = [{'clf__C': param_range,
-                   'clf__kernel': ['rbf'],
-                   'clf__gamma': param_range,
-                   'clf__epsilon': param_range2}]
-    gs = GridSearchCV(estimator=pipe_model, param_grid=param_grid,
-                      scoring='neg_mean_absolute_error', cv=5, iid=True, n_jobs=-1)
-    
-    ################# Whole Period #################
-    gs = gs.fit(X_train1, Y_train1)
-    print(gs.best_score_)
-    print(gs.best_params_)
 
-    best_params = gs.best_params_
-    best_model = gs.best_estimator_
+    # For Checkpoint
+    MODEL_SAVE_FOLDER_PATH = 'model/'
+    if not os.path.exists(MODEL_SAVE_FOLDER_PATH):
+        os.mkdir(MODEL_SAVE_FOLDER_PATH)
 
-    Y_pred = best_model.predict(X_test1)
-    MAE = mean_absolute_error(Y_test1, Y_pred)
-    print("test MAE", MAE)
-    RMSE = np.sqrt(mean_squared_error(Y_test1, Y_pred))
-    print("test RMSE", RMSE)
+    model_path = MODEL_SAVE_FOLDER_PATH + '{epoch:02d}-{val_loss:.4f}.hdf5'
+    cb_checkpoint = ModelCheckpoint(filepath=model_path, monitor='val_loss',
+                                    verbose=1, save_best_only=True)
 
-    x_data = range(len(test1_sc))
-    plt.plot(x_data[:], test1_sc[:len(test1_sc),0], color='red')
-    plt.plot(x_data[lookBack:], Y_pred[:], color='green')
-    plt.show()
-    
-    ################# Lehman #################
-    gs = gs.fit(X_train2, Y_train2)
-    print(gs.best_score_)
-    print(gs.best_params_)
+    for units in n_units:
+        
+        print("#######################"+str(units)+"#######################")
+              
+        K.clear_session()
+        model = Sequential()
+        model.add(Dense(units, activation='relu', input_shape=(lookBack, n_features),
+                        kernel_initializer='normal', name='Hidden-1'))
+        model.add(Dense(units, activation='relu', kernel_initializer='normal', name='Hidden-2'))
+        model.add(Dense(units, activation='relu', kernel_initializer='normal', name='Hidden-3'))
+        model.add(Flatten())
+        model.add(Dense(1, activation='relu', name='Output'))
+        model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mse', 'mae'])
+        model.summary()
 
-    best_params = gs.best_params_
-    best_model = gs.best_estimator_
+        history = model.fit(X_train1, Y_train1, epochs=100, batch_size=10, verbose=1)
+        model.save_weights('model/model.h5')
+        acc = history.history['mae']
+        loss = history.history['loss']
 
-    Y_pred = best_model.predict(X_test2)
-    MAE = mean_absolute_error(Y_test2, Y_pred)
-    print("test MAE", MAE)
-    RMSE = np.sqrt(mean_squared_error(Y_test2[:], Y_pred))
-    print("test RMSE", RMSE)
+        epochs = range(1, len(acc) + 1)
 
-    x_data = range(len(test2_sc))
-    plt.plot(x_data[:], test2_sc[:len(test2_sc),0], color='red')
-    plt.plot(x_data[lookBack:], Y_pred[:], color='green')
-    plt.show()
+        plt.plot(epochs, acc, 'b', label='Training mae')
+        plt.title('Mean_Absolute_Error')
+        plt.legend()
+        plt.figure()
+
+        plt.plot(epochs, loss, 'b', label='Training loss')
+        plt.title('Loss')
+        plt.legend()
+        plt.show()
+
+        Y_pred = model.predict(X_test1)
+
+        plot(Y_pred, Y_test1, n_features=n_features)
+        evaluate(Y_pred, Y_test1, n_features=n_features)
