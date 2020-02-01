@@ -11,19 +11,27 @@ import matplotlib.pyplot as plt
 
 scaler = StandardScaler()
 
-def splitTrainTest(data, train_period, test_period, multiVariate=False, gtruthName='SPI'):
+def splitTrainTest(data, train_period, test_period, multiVariate=False, gtruthName='SPI', period=1):
     if not multiVariate:
         train = data[[gtruthName]].loc[:train_period - 1]
         test = data[[gtruthName]].loc[train_period:train_period + test_period - 1]
+        
+        sc_data = scaler.fit_transform(data)
+        sc_train = sc_data[:train_period]
+        sc_test = sc_data[train_period:train_period+test_period]
+        
+        return train, test, sc_train, sc_test
+        
     else:
         train = data.loc[:train_period - 1]
         test = data.loc[train_period:train_period + test_period - 1]
-
-    train_sc = scaler.fit_transform(train)
-    test_sc = scaler.fit_transform(test)
-
-    return train, test, train_sc, test_sc
-
+        
+        sc_data = scaler.fit_transform(data)
+        sc_train = sc_data[:train_period]
+        sc_test = sc_data[train_period:train_period+test_period]
+        
+        return train, test, sc_train, sc_test
+        
 
 def makeSlidingWindows(origin_train, origin_test, train, test, lookBack=2, multiVariate=False, gtruthName='SPI'):
     train_df = pd.DataFrame(train, index=origin_train.index)
@@ -81,7 +89,8 @@ if __name__ == "__main__":
     train1, test1, train1_sc, test1_sc = splitTrainTest(data=data,
                                                         train_period=train_period1,
                                                         test_period=test_period1,
-                                                        multiVariate=multiVariate)
+                                                        multiVariate=multiVariate,
+                                                        period=1)
     train1_df, test1_df = makeSlidingWindows(origin_train=train1,
                                              origin_test=test1,
                                              train=train1_sc,
@@ -104,7 +113,8 @@ if __name__ == "__main__":
     train2, test2, train2_sc, test2_sc = splitTrainTest(data=data,
                                                         train_period=train_period2,
                                                         test_period=test_period2,
-                                                        multiVariate=multiVariate)
+                                                        multiVariate=multiVariate,
+                                                        period=2)
     train2_df, test2_df = makeSlidingWindows(origin_train=train2,
                                              origin_test=test2,
                                              train=train2_sc,

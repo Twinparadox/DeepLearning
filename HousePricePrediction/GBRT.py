@@ -11,19 +11,27 @@ import matplotlib.pyplot as plt
 
 scaler = StandardScaler()
 
-def splitTrainTest(data, train_period, test_period, multiVariate=False, gtruthName='SPI'):
+def splitTrainTest(data, train_period, test_period, multiVariate=False, gtruthName='SPI', period=1):
     if not multiVariate:
         train = data[[gtruthName]].loc[:train_period - 1]
         test = data[[gtruthName]].loc[train_period:train_period + test_period - 1]
+        
+        sc_data = scaler.fit_transform(data)
+        sc_train = sc_data[:train_period]
+        sc_test = sc_data[train_period:train_period+test_period]
+        
+        return train, test, sc_train, sc_test
+        
     else:
         train = data.loc[:train_period - 1]
         test = data.loc[train_period:train_period + test_period - 1]
-
-    train_sc = scaler.fit_transform(train)
-    test_sc = scaler.fit_transform(test)
-
-    return train, test, train_sc, test_sc
-
+        
+        sc_data = scaler.fit_transform(data)
+        sc_train = sc_data[:train_period]
+        sc_test = sc_data[train_period:train_period+test_period]
+        
+        return train, test, sc_train, sc_test
+        
 
 def makeSlidingWindows(origin_train, origin_test, train, test, lookBack=2, multiVariate=False, gtruthName='SPI'):
     train_df = pd.DataFrame(train, index=origin_train.index)
@@ -60,8 +68,6 @@ def makeSlidingWindows(origin_train, origin_test, train, test, lookBack=2, multi
             test_df[tmp_test.columns] = test_df[column_list].shift(s)
 
         return train_df, test_df
-
-
 
 def plot():
     pass
