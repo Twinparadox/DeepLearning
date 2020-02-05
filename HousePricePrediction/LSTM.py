@@ -1,6 +1,6 @@
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
 from keras.layers import LSTM
@@ -14,7 +14,7 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 
-scaler = StandardScaler()
+scaler = MinMaxScaler()
 
 def splitTrainTest(data, train_period, test_period, multiVariate=False, gtruthName='SPI', period=1):
     if not multiVariate:
@@ -106,7 +106,7 @@ def plot(pred, gtruth, n_features):
 
 if __name__ == "__main__":
     lookBack = 1
-    multiVariate = False
+    multiVariate = True
     n_features = 1
     train_period1 = 128
     test_period1 = 12
@@ -189,6 +189,8 @@ if __name__ == "__main__":
     cb_checkpoint = ModelCheckpoint(filepath=model_path, monitor='val_loss',
                                     verbose=1, save_best_only=True)
     
+    # Period1
+    '''
     period1_rmse = []
     period1_mae = []
     for units in n_units:
@@ -197,6 +199,7 @@ if __name__ == "__main__":
         K.clear_session()
         model = Sequential()
         model.add(LSTM(units, activation='relu', input_shape=(lookBack, n_features)))
+        print(model.layers[-1].input_shape)
         model.add(Dense(1))
         model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mse','mae'])
         model.summary()
@@ -206,7 +209,6 @@ if __name__ == "__main__":
         acc = history.history['mae']
         loss = history.history['loss']
         
-        '''
         x_epochs = range(1, len(acc) + 1)
     
         plt.plot(x_epochs, acc, 'b', label='Training mae')
@@ -218,7 +220,6 @@ if __name__ == "__main__":
         plt.title('Loss')
         plt.legend()
         plt.show()
-        '''
     
         Y_pred = model.predict(X_test1)
 
@@ -244,6 +245,7 @@ if __name__ == "__main__":
         K.clear_session()
         model = Sequential()
         model.add(LSTM(units, activation='relu', input_shape=(lookBack, n_features)))
+        print(model.layers[-1].input_shape)
         model.add(Dense(1))
         model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mse','mae'])
         model.summary()
@@ -252,8 +254,7 @@ if __name__ == "__main__":
         model.save('model/model_period2_'+str(units)+'.hdf5')
         acc = history.history['mae']
         loss = history.history['loss']
-    
-        '''
+        
         x_epochs = range(1, len(acc) + 1)
     
         plt.plot(x_epochs, acc, 'b', label='Training mae')
@@ -265,17 +266,17 @@ if __name__ == "__main__":
         plt.title('Loss')
         plt.legend()
         plt.show()
-        '''
-    
+        
         Y_pred = model.predict(X_test2)
         
         mae, rmse = evaluate(Y_pred, Y_test2, n_features=n_features)
         
         period2_rmse.append(rmse)
         period2_mae.append(mae)
+    '''
     
-    model1 = load_model('model/model_period1_150.hdf5')
-    model2 = load_model('model/model_period2_300.hdf5')
+    model1 = load_model('model/model_period1_50.hdf5')
+    model2 = load_model('model/model_period2_50.hdf5')
     
     Y1_pred = model1.predict(X_test1)
     Y2_pred = model2.predict(X_test2)
