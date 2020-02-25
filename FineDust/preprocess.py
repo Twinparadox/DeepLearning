@@ -67,15 +67,13 @@ if __name__ == '__main__':
     del [df_2010, df_2011, df_2012, df_2013, df_2014, df_2015, df_2016, df_2017]
     gc.collect()
     
-    #mask = df_air['locale'].isin(['평균'])
-    #df_air = df_air[mask]
-    #del mask
-    del df_air['locale']
+    mask = df_air['locale'].isin(['평균'])
+    df_air = df_air[~mask]
+    del mask
     del df_air['O3']
     gc.collect()
     
-    print(df_air.dtypes)
-    
+    print(df_air.dtypes)    
     
     # climate
     climate_data_type = {'id':'uint8',
@@ -103,7 +101,7 @@ if __name__ == '__main__':
     df_climate = pd.read_csv('data/climate.csv', engine='c', dtype=climate_data_type,
                              parse_dates=['date'])
     df_climate['date'] = df_climate['date'].dt.strftime('%Y-%m-%d')
-    del df_climate[['id']
+    del df_climate['id']
     del df_climate['locale']
     gc.collect()    
     
@@ -117,5 +115,5 @@ if __name__ == '__main__':
     df_result = df_result.fillna(0)
 
     remove_outlier(df_result)
-    df_result.to_csv('./data/prep_data.csv', sep=',', na_rep='NaN')
+    df_result.to_csv('./data/prep_data.csv', sep=',', na_rep='NaN', encoding='utf-8-sig')
 
