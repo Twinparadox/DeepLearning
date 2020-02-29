@@ -12,25 +12,35 @@ import matplotlib.pyplot as plt
 #import seaborn as sns
 
 def outliers_iqr(data):
+    data = data.astype('float32')
+    mean = data.mean()
     q1, q3 = np.percentile(data, [25,75])
     iqr = q3-q1
     lower_bound = q1-(iqr*1.5)
     upper_bound = q3+(iqr*1.5)
-    return np.where((data>upper_bound) | (data<lower_bound))
+    
+    return np.where((data>upper_bound) | (data<lower_bound), mean, data)
 
 def outliers_z_score(data, threshold=3):
-    mean = np.mean(data)
-    std = np.std(data)
+    data = data.astype('float32')
+    mean = data.mean()
+    std = data.std()
     z_scores = [(y-mean)/std for y in data]
-    return np.where(np.abs(z_scores)>threshold)
+    
+    print(data, mean)
+    
+    return np.where(np.abs(z_scores)>threshold, mean, data)
 
 def remove_outlier(data):
-    value = ['PM10', 'NO2', 'CO', 'SO2', 'avg_tmp', 'min_tmp', 'max_tmp',
-             'precipitation', 'max_inst_wind', 'max_inst_wind_direct',
-             'max_avg_wind_direct', 'avg_wind', 'min_humid', 'avg_humid',
-             'avg_hPa', 'avg_total_cloud', 'avg_mid_cloud', 'avg_gtmp',
-             'avg_gtmp5', 'avg_gtmp10', 'avg_gtmp150', 'avg_gtmp300']
+    input_data = data.columns
+    print(input_data)
+    
+    for cols in data:
+        if cols!='PM10' and cols!='locale':
+            data[cols] = outliers_iqr(data[cols])
 
+    return data    
+        
 if __name__ == '__main__':
     
     # air
@@ -110,10 +120,13 @@ if __name__ == '__main__':
     df_result = pd.merge(df_air, df_climate, left_on=['date'], right_index=True, how='left')
     df_result = df_result.reset_index()
     df_result = df_result.sort_values(by=['date'],axis=0)
+    df_result = df_result.set_index('date')
     
     print(df_result.dtypes)
     df_result = df_result.fillna(0)
-
-    remove_outlier(df_result)
+    
+    print(df_result['avg_humid'].describe())
+    df_result = remove_outlier(df_result)
+    
     df_result.to_csv('./data/prep_data.csv', sep=',', na_rep='NaN', encoding='utf-8-sig')
 
