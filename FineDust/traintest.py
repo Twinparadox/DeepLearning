@@ -28,6 +28,13 @@ import matplotlib.pyplot as plt
 
 scaler = StandardScaler()
 
+def create_dataset(signal_data, look_back=4):
+    dataX, dataY = [], []
+    for i in range(len(signal_data)-look_back):
+        dataX.append(signal_data[i:(i+look_back), 0])
+        dataY.append(signal_data[i + look_back, 0])
+    return np.array(dataX), np.array(dataY)
+
 def ml_linear_regression(X_train, X_test, Y_train, Y_test):
     del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
@@ -159,25 +166,97 @@ def dl_LSTM(X_train, X_test, Y_train, Y_test):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.fit_transform(X_test)
     
+    X_train = np.repeat(X_train, ts, axis=0)
+    X_test = np.repeat(X_test, ts, axis=0)
+    
     Y_train = to_categorical(Y_train)
     Y_test = to_categorical(Y_test)
     
-    X_train = X_train.reshape(-1,4,11)
+    X_train = X_train.reshape(-1,11,ts)
+    X_test = X_test.reshape(-1,11,ts)    
     
-    X_test = X_test * 4
-    Y_test = Y_test * 4
+    print(Y_train.shape)
+    print(Y_test.shape)
+    
+    # LSTM
+    lstm_output_size = 64
+    
+    # batch_size
+    batch_size = 32
+    
+    rmsprop=optimizers.RMSprop()
+              
+    model=Sequential()
+    model.add(LSTM(64, input_shape=(11, ts), activation='relu', kernel_initializer='glorot_normal',
+                   bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
+    model.add(Dropout(0.3))
+    model.add(Dense(4, kernel_initializer='glorot_normal',
+                    bias_initializer='glorot_normal', activation='softmax'))
+    model.compile(optimizer=rmsprop, loss='categorical_crossentropy', metrics=['accuracy'])
+    model.summary()
+    
+    history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=10, verbose=1)
+    loss = history.history['loss']
+
+    x_epochs = range(1, len(loss) + 1)
+
+    plt.plot(x_epochs, loss, 'b', label='Training loss')
+    plt.title('Loss')
+    plt.legend()
+    plt.show()
+
+    score = model.evaluate(X_test, Y_test, batch_size=batch_size)
+    print(score)
+    
+def dl_StackedLSTM(X_train, X_test, Y_train, Y_test):
+    ts = 4
+    
+    del [X_train['locale'], X_test['locale']]
+    del [X_train['date'], X_test['date']]
+    
+    X_train = X_train.astype(float)
+    X_test = X_test.astype(float)
+    
+    del [X_train['PM10'], X_test['PM10']]
+    gc.collect()
+            
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.fit_transform(X_test)
+    
+    X_train = np.repeat(X_train, ts, axis=0)
+    X_test = np.repeat(X_test, ts, axis=0)
+    
+    Y_train = to_categorical(Y_train)
+    Y_test = to_categorical(Y_test)
+    
+    X_train = np.reshape(X_train, X_train.shape+(1,))
+    X_test = np.reshape(X_test, X_test.shape+(1,))
+    X_train = X_train.reshape(-1,11,ts)
+    X_test = X_test.reshape(-1,11,ts)
     print(X_train.shape)
     print(X_test.shape)
     
     #Y_train = Y_train.reshape(-1,1,4)
     #Y_test = Y_test.reshape(-1,1,4)
     print(Y_train.shape)
-    print(Y_test.shape)
+    print(Y_test.shape) 
+    
+    # LSTM
+    lstm_output_size = 64
+    
+    # batch_size
+    batch_size = 32
     
     rmsprop=optimizers.RMSprop()
-              
-    model=Sequential()
-    model.add(LSTM(64, input_shape=(ts, 11), activation='relu', kernel_initializer='glorot_normal',
+    
+    model = Sequential()
+    model.add(LSTM(lstm_output_size, input_shape=(11, ts), kernel_initializer='glorot_normal',
+                   bias_initializer='glorot_normal', recurrent_initializer='glorot_normal', return_sequences=True))
+    model.add(Dropout(0.3))
+    model.add(LSTM(lstm_output_size, kernel_initializer='glorot_normal',
+                   bias_initializer='glorot_normal', recurrent_initializer='glorot_normal', return_sequences=True))
+    model.add(Dropout(0.3))
+    model.add(LSTM(lstm_output_size, kernel_initializer='glorot_normal',
                    bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
     model.add(Dropout(0.3))
     model.add(Dense(4, kernel_initializer='glorot_normal',
@@ -195,47 +274,12 @@ def dl_LSTM(X_train, X_test, Y_train, Y_test):
     plt.legend()
     plt.show()
 
-    score = model.evaluate(X_test, Y_test, batch_size=1000)
+    score = model.evaluate(X_test, Y_test, batch_size=32)
     print(score)
     
-def dl_StackLSTM(X_train, X_test, Y_train, Y_test):
-    del [X_train['locale'], X_test['locale']]
-    del [X_train['date'], X_test['date']]
-    
-    X_train = X_train.astype(float)
-    X_test = X_test.astype(float)
-    
-    del [X_train['PM10'], X_test['PM10']]
-    gc.collect()
-        
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.fit_transform(X_test)
-    
-    Y_train = to_categorical(Y_train)
-    Y_test = to_categorical(Y_test)
-    
-    X_train = np.reshape(X_train, X_train.shape+(1,))
-    X_test = np.reshape(X_test, X_test.shape+(1,))
-    X_train = X_train.reshape(-1,1,11,1)
-    X_test = X_test.reshape(-1,1,11,1)
-    print(X_train.shape)
-    print(X_test.shape)
-    
-    #Y_train = Y_train.reshape(-1,1,4)
-    #Y_test = Y_test.reshape(-1,1,4)
-    print(Y_train.shape)
-    print(Y_test.shape)
-    
-    model = Sequential()
-    for i in range(2):
-        model.add(LSTM(32, batch_input_shape=(1, look_back, 1), stateful=True, return_sequences=True))
-        model.add(Dropout(0.3))
-    model.add(LSTM(32, batch_input_shape=(1, look_back, 1), stateful=True))
-    model.add(Dropout(0.3))
-    model.add(Dense(1))
-    pass
-    
 def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
+    ts = 4
+    
     del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
     
@@ -248,13 +292,16 @@ def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.fit_transform(X_test)
     
+    X_train = np.repeat(X_train, ts, axis=0)
+    X_test = np.repeat(X_test, ts, axis=0)
+    
     Y_train = to_categorical(Y_train)
     Y_test = to_categorical(Y_test)
     
     X_train = np.reshape(X_train, X_train.shape+(1,))
     X_test = np.reshape(X_test, X_test.shape+(1,))
-    X_train = X_train.reshape(-1,1,11,1)
-    X_test = X_test.reshape(-1,1,11,1)
+    X_train = X_train.reshape(-1,ts,1,11,1)
+    X_test = X_test.reshape(-1,ts,1,11,1)
     print(X_train.shape)
     print(X_test.shape)
     
@@ -277,21 +324,23 @@ def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
     rmsprop=optimizers.RMSprop()
 
     model=Sequential()
-    model.add(Conv2D(filters=filters,
+    model.add(TimeDistributed(Conv2D(filters=filters,
                                      kernel_size=kernel_size,
                                      padding='same',
-                                     activation='relu',
-                                     input_shape=(1,11,1)))
-    model.add(MaxPooling2D(pool_size=pool_size, name="MaxPooling"))
-    model.add(Dropout(0.3))
+                                     activation='relu'), input_shape=(ts, 1, 11, 1)))
+    model.add(TimeDistributed(MaxPooling2D(pool_size=pool_size, name="MaxPooling")))
+    model.add(TimeDistributed(Dropout(0.3)))
     model.add(TimeDistributed(Flatten(name="Flatten")))
-    model.add(LSTM(lstm_output_size, return_sequences=True, activation='relu', name="LSTM1", kernel_initializer='glorot_normal',
+    model.add(LSTM(lstm_output_size, return_sequences=True, activation='relu', 
+                   name="LSTM1", kernel_initializer='glorot_normal',
                    bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
     model.add(Dropout(0.3))
-    model.add(LSTM(lstm_output_size, return_sequences=True, activation='relu', name="LSTM2", kernel_initializer='glorot_normal',
+    model.add(LSTM(lstm_output_size, return_sequences=True, activation='relu', 
+                   name="LSTM2", kernel_initializer='glorot_normal',
                    bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
     model.add(Dropout(0.3))
-    model.add(LSTM(lstm_output_size, activation='relu', name="LSTM3", kernel_initializer='glorot_normal',
+    model.add(LSTM(lstm_output_size, activation='relu', 
+                   name="LSTM3", kernel_initializer='glorot_normal',
                    bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
     model.add(Dropout(0.3))
     model.add(Dense(256, name="FCN1"))
@@ -368,5 +417,6 @@ if __name__ == "__main__":
     #ml_linear_regression(X_train, X_test, Y_train, Y_test)
     #ml_logistic_regression(X_train, X_test, Y_train, Y_test)
     #dl_DNN(X_train, X_test, Y_train, Y_test)
-    dl_LSTM(X_train, X_test, Y_train, Y_test)
-    #dl_CNNLSTM(X_train, X_test, Y_train, Y_test)
+    #dl_LSTM(X_train, X_test, Y_train, Y_test)
+    #dl_StackedLSTM(X_train, X_test, Y_train, Y_test)
+    dl_CNNLSTM(X_train, X_test, Y_train, Y_test)
