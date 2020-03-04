@@ -9,7 +9,12 @@ import numpy as np
 import gc
 
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from statsmodels.formula.api import ols
 #import seaborn as sns
+
+scaler = StandardScaler()
 
 def outliers_iqr(data):
     data = data.astype('float32')
@@ -42,6 +47,9 @@ def remove_outlier(data):
     return data    
         
 if __name__ == '__main__':
+    pd.set_option('display.max_rows', 500)
+    pd.set_option('display.max_columns', 500)
+    pd.set_option('display.width', 1000)
     
     # air
     air_data_type = {'날짜':'str',
@@ -108,7 +116,7 @@ if __name__ == '__main__':
                          'avg_gtmp150':'float16',
                          'avg_gtmp300':'float16'}
     
-    df_climate = pd.read_csv('data/climate.csv', engine='c', dtype=climate_data_type,
+    df_climate = pd.read_csv('data/climate2.csv', engine='c',
                              parse_dates=['date'])
     df_climate['date'] = df_climate['date'].dt.strftime('%Y-%m-%d')
     del df_climate['id']
@@ -128,5 +136,42 @@ if __name__ == '__main__':
     print(df_result['avg_humid'].describe())
     df_result = remove_outlier(df_result)
     
-    df_result.to_csv('./data/prep_data.csv', sep=',', na_rep='NaN', encoding='utf-8-sig')
+    #df_result.to_csv('./data/prep_data.csv', sep=',', na_rep='NaN', encoding='utf-8-sig')
+    
+    del [df_result['locale']]
+       
+    #df_result = df_result.drop(['avg_hPa_g', 'avg_hPa_o', 'min_hPa_o', 'max_hPa_o'], axis=1)
+    
+    ls = df_result.columns
+    corrs = df_result.corr()
+    print(corrs)
+    
+    hm = sns.heatmap(df_result.corr(),annot=True,cmap='RdYlGn',linewidths=0.2, 
+                vmax=1, vmin=-1, fmt='3.1f', xticklabels=True, yticklabels=True)
+    print(hm.get_ylim())
+    bottom, top = hm.get_ylim()
+    fig=plt.gcf()
+    fig.set_size_inches(25,25)
+    plt.ylim(bottom+1.0, top-0.5)
+    plt.savefig('variance.png', dpi=300)
+    
+    
+    '''
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
 
+    vif = pd.DataFrame()
+    vif["VIF Factor"] = [variance_inflation_factor(
+        df_result.values, i) for i in range(df_result.shape[1])]
+    vif["features"] = df_result.columns
+    
+    df_result = scaler.fit_transform(df_result)
+    pca = PCA()
+    pca.fit(df_result)
+    
+    p = pca
+    
+    plt.plot(np.cumsum(pca.explained_variance_ratio_))
+    plt.xlabel('Number of components')
+    plt.ylabel('Cumulative explained variance')
+    plt.show()
+    '''

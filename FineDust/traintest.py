@@ -25,6 +25,8 @@ import pandas as pd
 import os
 import gc
 import matplotlib.pyplot as plt
+import seaborn as sns
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 scaler = StandardScaler()
 
@@ -33,9 +35,10 @@ def create_dataset(signal_data, look_back=4):
     for i in range(len(signal_data)-look_back):
         dataX.append(signal_data[i:(i+look_back), 0])
         dataY.append(signal_data[i + look_back, 0])
-    return np.array(dataX), np.array(dataY)
+        return np.array(dataX), np.array(dataY)
+    
 
-def ml_linear_regression(X_train, X_test, Y_train, Y_test):
+#def ml_linear_regression(X_train, X_test, Y_train, Y_test):
     del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
     
@@ -154,6 +157,11 @@ def dl_DNN(X_train, X_test, Y_train, Y_test):
 def dl_LSTM(X_train, X_test, Y_train, Y_test):
     ts = 4
     
+    X_train = X_train.sort_values(by=['locale', 'date'], axis=0)
+    X_test = X_test.sort_values(by=['locale', 'date'], axis=0)
+    
+    print(X_train)
+    print(X_test)
     del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
     
@@ -166,14 +174,14 @@ def dl_LSTM(X_train, X_test, Y_train, Y_test):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.fit_transform(X_test)
     
-    X_train = np.repeat(X_train, ts, axis=0)
-    X_test = np.repeat(X_test, ts, axis=0)
+    X_train = np.append(X_train, np.repeat(X_train, ts-1))
+    X_test = np.append(X_test, np.repeat(X_test, ts-1))
     
     Y_train = to_categorical(Y_train)
     Y_test = to_categorical(Y_test)
     
-    X_train = X_train.reshape(-1,11,ts)
-    X_test = X_test.reshape(-1,11,ts)    
+    X_train = X_train.reshape(-1,12,ts)
+    X_test = X_test.reshape(-1,12,ts)    
     
     print(Y_train.shape)
     print(Y_test.shape)
@@ -187,7 +195,7 @@ def dl_LSTM(X_train, X_test, Y_train, Y_test):
     rmsprop=optimizers.RMSprop()
               
     model=Sequential()
-    model.add(LSTM(64, input_shape=(11, ts), activation='relu', kernel_initializer='glorot_normal',
+    model.add(LSTM(64, input_shape=(12, ts), activation='relu', kernel_initializer='glorot_normal',
                    bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
     model.add(Dropout(0.3))
     model.add(Dense(4, kernel_initializer='glorot_normal',
@@ -300,8 +308,8 @@ def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
     
     X_train = np.reshape(X_train, X_train.shape+(1,))
     X_test = np.reshape(X_test, X_test.shape+(1,))
-    X_train = X_train.reshape(-1,ts,1,11,1)
-    X_test = X_test.reshape(-1,ts,1,11,1)
+    X_train = X_train.reshape(-1,ts,1,12,1)
+    X_test = X_test.reshape(-1,ts,1,12,1)
     print(X_train.shape)
     print(X_test.shape)
     
@@ -321,40 +329,47 @@ def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
     # batch_size
     batch_size = 32
     
-    rmsprop=optimizers.RMSprop()
+    rmsprop=optimizers.RMSprop(lr=0.0001)
 
     model=Sequential()
     model.add(TimeDistributed(Conv2D(filters=filters,
                                      kernel_size=kernel_size,
                                      padding='same',
-                                     activation='relu'), input_shape=(ts, 1, 11, 1)))
+                                     activation='relu'), input_shape=(ts, 1, 12, 1)))
     model.add(TimeDistributed(MaxPooling2D(pool_size=pool_size, name="MaxPooling")))
     model.add(TimeDistributed(Dropout(0.3)))
     model.add(TimeDistributed(Flatten(name="Flatten")))
     model.add(LSTM(lstm_output_size, return_sequences=True, activation='relu', 
-                   name="LSTM1", kernel_initializer='glorot_normal',
-                   bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
+                   name="LSTM1"))
     model.add(Dropout(0.3))
     model.add(LSTM(lstm_output_size, return_sequences=True, activation='relu', 
-                   name="LSTM2", kernel_initializer='glorot_normal',
-                   bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
+                   name="LSTM2"))
     model.add(Dropout(0.3))
     model.add(LSTM(lstm_output_size, activation='relu', 
-                   name="LSTM3", kernel_initializer='glorot_normal',
-                   bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
+                   name="LSTM3"))
     model.add(Dropout(0.3))
     model.add(Dense(256, name="FCN1"))
     model.add(Dense(4, activation='softmax', name="OUTPUT"))
     model.compile(optimizer=rmsprop, loss='categorical_crossentropy',  metrics=['accuracy'])
     model.summary()
     
-    history = model.fit(X_train, Y_train, batch_size=batch_size, epochs=10)
+    history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(X_test, Y_test), epochs=30)
     loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
 
     x_epochs = range(1, len(loss) + 1)
 
     plt.plot(x_epochs, loss, 'b', label='Training loss')
+    plt.plot(x_epochs, val_loss, 'r', label='Validation loss')
     plt.title('Loss')
+    plt.legend()
+    plt.show()
+    
+    plt.plot(x_epochs, acc, 'b', label='Training acc')
+    plt.plot(x_epochs, val_acc, 'r', label='Test acc')
+    plt.title('Accuracy')
     plt.legend()
     plt.show()
 
@@ -391,8 +406,33 @@ if __name__ == "__main__":
     df_data = pd.read_csv('data/prep_data.csv', dtype=data_types, engine='c',
                              parse_dates=['date'])
     df_data['date'] = df_data['date'].dt.strftime('%Y-%m-%d')
-    df_data = df_data.drop(['min_tmp', 'max_tmp', 'max_inst_wind', 'max_avg_wind_direct', 'min_humid', 'avg_mid_cloud',
-                            'avg_gtmp5', 'avg_gtmp10', 'avg_gtmp150', 'avg_gtmp300'], axis=1)
+    
+    '''
+    corr = df_data.corr()
+    sns.heatmap(df_data.corr(),annot=True,cmap='RdYlGn',linewidths=0.2, 
+                vmax=1, vmin=-1)
+    fig=plt.gcf()
+    fig.set_size_inches(15,15)
+    plt.savefig('variance.png', dpi=300)
+    plt.show()
+    
+    del df_data['date']
+    del df_data['PM10']
+    del df_data['locale']
+    
+    df_data = df_data.astype(float)
+    vif = pd.DataFrame()
+    vif["VIF Factor"] = [variance_inflation_factor(
+        df_data.values, i) for i in range(df_data.shape[1])]
+    vif["features"] = df_data.columns
+    
+    '''
+    df_data = df_data.drop(['avg_humid','avg_gtmp300','avg_gtmp150','avg_gtmp','min_tmp',
+                            'max_tmp', 'avg_gtmp10', 'avg_gtmp5', 'avg_tmp'], axis=1)
+    
+    #df_data = df_data[['date','locale','PM10','SO2','CO','NO2','avg_tmp',
+    #                   'precipitation','max_inst_wind_direct','avg_wind',
+     #                  'avg_humid','avg_hPa','avg_total_cloud','avg_gtmp']]
     gc.collect()
 
     # PM10 encoding
@@ -420,3 +460,4 @@ if __name__ == "__main__":
     #dl_LSTM(X_train, X_test, Y_train, Y_test)
     #dl_StackedLSTM(X_train, X_test, Y_train, Y_test)
     dl_CNNLSTM(X_train, X_test, Y_train, Y_test)
+    
