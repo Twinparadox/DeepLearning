@@ -47,6 +47,20 @@ def resampling(df_store, df_train):
     train_store_freq = df_sampling_train['store_nbr'].value_counts()
     
     return pd.DataFrame(df_sampling_train)
+    
+def nwrmsle(predictions, targets, weights):
+    if type(predictions) == list:
+        predictions = np.array([np.nan if x < 0 else x for x in predictions])
+
+    elif type(predictions) == pd.Series:
+        predictions[predictions < 0] = np.nan
+
+    targetsf = targets.astype(float)
+    targetsf[targets < 0] = np.nan
+    weights = 1 + 0.25 * weights
+    log_square_errors = (np.log(predictions + 1) - np.log(targetsf + 1)) ** 2
+
+    return(np.sqrt(np.sum(weights * log_square_errors) / np.sum(weights)))    
 
 def ml_linearRegression(X_train, Y_train, X_test, X_stratify):
     X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train,
@@ -57,7 +71,7 @@ def ml_linearRegression(X_train, Y_train, X_test, X_stratify):
     model.fit(X_train, Y_train)
     
     Y_pred = model.predict(X_valid)
-    print(mean_squared_error(Y_valid, Y_pred))
+    print(RMSLE(y_tru, y_pred))
 
 def ml_logisticRegression(X_train, Y_train, X_test, X_stratify):
     X_train, X_valid, Y_train, Y_valid = train_test_split(X_train, Y_train,
@@ -110,16 +124,16 @@ def DNN(X_train, Y_train, X_test, X_stratify):
     model.add(Dense(64, kernel_initializer='normal', activation='relu'))
     model.add(Dense(64, kernel_initializer='normal', activation='relu'))
     model.add(Dense(1, kernel_initializer='normal'))
-    model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mse'])
+    model.compile(loss=RMSLE, optimizer='adam', metrics=[RMSLE])
     
     history = model.fit(X_train, Y_train, epochs=epochs, batch_size=batch_size, verbose=1)
     model.save('model/model_DNN.hdf5')
-    mse = history.history['mse']
+    rmsle = history.history[RMSLE]
     loss = history.history['loss']
     
-    x_epochs = range(1, len(mse) + 1)
+    x_epochs = range(1, len(rmsle) + 1)
     
-    plt.plot(x_epochs, mse, 'b', label='Training mae')
+    plt.plot(x_epochs, rmsle, 'b', label='Training mae')
     plt.title('Mean_Absolute_Error')
     plt.legend()
     plt.figure()
@@ -131,20 +145,6 @@ def DNN(X_train, Y_train, X_test, X_stratify):
     
     Y_pred = model.predict(X_valid)
     print(mean_squared_error(Y_valid, Y_pred))
-    
-def nwrmsle(predictions, targets, weights):
-    if type(predictions) == list:
-        predictions = np.array([np.nan if x < 0 else x for x in predictions])
-
-    elif type(predictions) == pd.Series:
-        predictions[predictions < 0] = np.nan
-
-    targetsf = targets.astype(float)
-    targetsf[targets < 0] = np.nan
-    weights = 1 + 0.25 * weights
-    log_square_errors = (np.log(predictions + 1) - np.log(targetsf + 1)) ** 2
-
-    return(np.sqrt(np.sum(weights * log_square_errors) / np.sum(weights)))    
 
 if __name__ == "__main__":
     df_train = pd.read_csv('./data/prep_train.csv', engine='c')

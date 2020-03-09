@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from statsmodels.formula.api import ols
-#import seaborn as sns
+import seaborn as sns
 
 scaler = StandardScaler()
 
@@ -136,12 +136,11 @@ if __name__ == '__main__':
     print(df_result['avg_humid'].describe())
     df_result = remove_outlier(df_result)
     
-    #df_result.to_csv('./data/prep_data.csv', sep=',', na_rep='NaN', encoding='utf-8-sig')
-    
-    del [df_result['locale']]
+    #del [df_result['locale']]
        
     #df_result = df_result.drop(['avg_hPa_g', 'avg_hPa_o', 'min_hPa_o', 'max_hPa_o'], axis=1)
     
+    '''
     ls = df_result.columns
     corrs = df_result.corr()
     print(corrs)
@@ -156,13 +155,26 @@ if __name__ == '__main__':
     plt.savefig('variance.png', dpi=300)
     
     
-    '''
     from statsmodels.stats.outliers_influence import variance_inflation_factor
 
+    df_result = df_result.drop(['PM10',
+                                'day_max_snow', 'day_max_new_snow', 'sun_time', 'sun_sum', 'max_wind',
+                                'avg_hPa_g', 'avg_hPa_o', 'min_hPa_o', 'max_hPa_o',
+                                'max_tmp', 'min_tmp',
+                                'avg_gtmp5', 'avg_gtmp10', 'avg_gtmp50',
+                                'avg_gtmp100', 'avg_gtmp300', 'avg_gtmp', 'min_chosang',
+                                'sun_possible',
+                                'avg_humid', 'avg_dew',
+                                'avg_total_cloud',
+                                'max_inst_wind', 'max_wind_direct',
+                                'avg_wind'], axis=1)
     vif = pd.DataFrame()
     vif["VIF Factor"] = [variance_inflation_factor(
         df_result.values, i) for i in range(df_result.shape[1])]
     vif["features"] = df_result.columns
+    print(vif)
+    
+    #sns.pairplot(df_result)
     
     df_result = scaler.fit_transform(df_result)
     pca = PCA()
@@ -175,3 +187,16 @@ if __name__ == '__main__':
     plt.ylabel('Cumulative explained variance')
     plt.show()
     '''
+    
+    df_result = df_result.drop(['day_max_snow', 'day_max_new_snow', 'sun_time', 'sun_sum', 'max_wind',
+                                'avg_hPa_g', 'avg_hPa_o', 'min_hPa_o', 'max_hPa_o',
+                                'max_tmp', 'min_tmp',
+                                'avg_gtmp5', 'avg_gtmp10', 'avg_gtmp50',
+                                'avg_gtmp100', 'avg_gtmp300', 'avg_gtmp', 'min_chosang',
+                                'sun_possible',
+                                'avg_humid', 'avg_dew',
+                                'avg_total_cloud',
+                                'max_inst_wind', 'max_wind_direct',
+                                'avg_wind'], axis=1)
+    
+    df_result.to_csv('./data/prep_data.csv', sep=',', na_rep='NaN', encoding='utf-8-sig')

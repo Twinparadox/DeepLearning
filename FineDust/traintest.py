@@ -7,6 +7,7 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_squared_log_error
+from keras.callbacks import EarlyStopping
 from keras.layers import LSTM
 from keras.layers import Conv2D, MaxPooling2D, TimeDistributed
 from keras.layers import Dense, Dropout
@@ -38,8 +39,8 @@ def create_dataset(signal_data, look_back=4):
         return np.array(dataX), np.array(dataY)
     
 
-#def ml_linear_regression(X_train, X_test, Y_train, Y_test):
-    del [X_train['locale'], X_test['locale']]
+def ml_linear_regression(X_train, X_test, Y_train, Y_test):
+    #del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
     
     X_train = X_train.astype(float)
@@ -74,7 +75,7 @@ def create_dataset(signal_data, look_back=4):
     print(score)
 
 def ml_logistic_regression(X_train, X_test, Y_train, Y_test):
-    del [X_train['locale'], X_test['locale']]
+    #del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
     
     X_train = X_train.astype(float)
@@ -110,7 +111,7 @@ def ml_logistic_regression(X_train, X_test, Y_train, Y_test):
     print(score)
 
 def dl_DNN(X_train, X_test, Y_train, Y_test):
-    del [X_train['locale'], X_test['locale']]
+    #del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
     
     X_train = X_train.astype(float)
@@ -157,11 +158,11 @@ def dl_DNN(X_train, X_test, Y_train, Y_test):
 def dl_LSTM(X_train, X_test, Y_train, Y_test):
     ts = 4
     
-    X_train = X_train.sort_values(by=['locale', 'date'], axis=0)
-    X_test = X_test.sort_values(by=['locale', 'date'], axis=0)
+    #X_train = X_train.sort_values(by=['locale', 'date'], axis=0)
+    #X_test = X_test.sort_values(by=['locale', 'date'], axis=0)
     
-    print(X_train)
-    print(X_test)
+    #print(X_train)
+    #print(X_test)
     del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
     
@@ -174,14 +175,14 @@ def dl_LSTM(X_train, X_test, Y_train, Y_test):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.fit_transform(X_test)
     
-    X_train = np.append(X_train, np.repeat(X_train, ts-1))
-    X_test = np.append(X_test, np.repeat(X_test, ts-1))
+    X_train = np.repeat(X_train, ts, axis=0)
+    X_test = np.repeat(X_test, ts, axis=0)
     
     Y_train = to_categorical(Y_train)
     Y_test = to_categorical(Y_test)
     
-    X_train = X_train.reshape(-1,12,ts)
-    X_test = X_test.reshape(-1,12,ts)    
+    X_train = X_train.reshape(-1,10,ts)
+    X_test = X_test.reshape(-1,10,ts)    
     
     print(Y_train.shape)
     print(Y_test.shape)
@@ -192,10 +193,16 @@ def dl_LSTM(X_train, X_test, Y_train, Y_test):
     # batch_size
     batch_size = 32
     
-    rmsprop=optimizers.RMSprop()
+    rmsprop=optimizers.RMSprop(lr=0.0005, decay=1e-6)
+    
+    checkpoint_filepath = os.path.join('model', 'fresh_models', '{0}_LSTM.{1}-{2}.h5'.format('model', '{epoch:02d}', '{val_loss:.7f}'))
+    checkpoint_callback = ModelCheckpoint(checkpoint_filepath, save_best_only=True, verbose=1)
+    early_stopping_callback = EarlyStopping(monitor="val_loss", patience=10, verbose=1)
+    callbacks=[checkpoint_callback, early_stopping_callback]
+
               
     model=Sequential()
-    model.add(LSTM(64, input_shape=(12, ts), activation='relu', kernel_initializer='glorot_normal',
+    model.add(LSTM(64, input_shape=(10, ts), activation='relu', kernel_initializer='glorot_normal',
                    bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
     model.add(Dropout(0.3))
     model.add(Dense(4, kernel_initializer='glorot_normal',
@@ -217,7 +224,8 @@ def dl_LSTM(X_train, X_test, Y_train, Y_test):
     print(score)
     
 def dl_StackedLSTM(X_train, X_test, Y_train, Y_test):
-    ts = 4
+    ts = 4    
+    n_features = 10
     
     del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
@@ -239,8 +247,8 @@ def dl_StackedLSTM(X_train, X_test, Y_train, Y_test):
     
     X_train = np.reshape(X_train, X_train.shape+(1,))
     X_test = np.reshape(X_test, X_test.shape+(1,))
-    X_train = X_train.reshape(-1,11,ts)
-    X_test = X_test.reshape(-1,11,ts)
+    X_train = X_train.reshape(-1,n_features,ts)
+    X_test = X_test.reshape(-1,n_features,ts)
     print(X_train.shape)
     print(X_test.shape)
     
@@ -255,24 +263,28 @@ def dl_StackedLSTM(X_train, X_test, Y_train, Y_test):
     # batch_size
     batch_size = 32
     
-    rmsprop=optimizers.RMSprop()
+    rmsprop=optimizers.RMSprop(lr=0.0005, decay=1e-6)
+    
+    checkpoint_filepath = os.path.join('model', 'fresh_models', '{0}_stackedLSTM.{1}-{2}.h5'.format('model', '{epoch:02d}', '{val_loss:.7f}'))
+    checkpoint_callback = ModelCheckpoint(checkpoint_filepath, save_best_only=True, verbose=1)
+    early_stopping_callback = EarlyStopping(monitor="val_loss", patience=10, verbose=1)
+    callbacks=[checkpoint_callback, early_stopping_callback]
+
     
     model = Sequential()
-    model.add(LSTM(lstm_output_size, input_shape=(11, ts), kernel_initializer='glorot_normal',
-                   bias_initializer='glorot_normal', recurrent_initializer='glorot_normal', return_sequences=True))
+    model.add(LSTM(lstm_output_size, input_shape=(n_features, ts),
+                   kernel_initializer='glorot_normal',return_sequences=True))
     model.add(Dropout(0.3))
-    model.add(LSTM(lstm_output_size, kernel_initializer='glorot_normal',
-                   bias_initializer='glorot_normal', recurrent_initializer='glorot_normal', return_sequences=True))
+    model.add(LSTM(lstm_output_size, kernel_initializer='glorot_normal', return_sequences=True))
     model.add(Dropout(0.3))
-    model.add(LSTM(lstm_output_size, kernel_initializer='glorot_normal',
-                   bias_initializer='glorot_normal', recurrent_initializer='glorot_normal'))
+    model.add(LSTM(lstm_output_size, kernel_initializer='glorot_normal'))
     model.add(Dropout(0.3))
     model.add(Dense(4, kernel_initializer='glorot_normal',
                     bias_initializer='glorot_normal', activation='softmax'))
     model.compile(optimizer=rmsprop, loss='categorical_crossentropy', metrics=['accuracy'])
     model.summary()
     
-    history = model.fit(X_train, Y_train, batch_size=32, epochs=10, verbose=1)
+    history = model.fit(X_train, Y_train, batch_size=32, epochs=20, verbose=1)
     loss = history.history['loss']
 
     x_epochs = range(1, len(loss) + 1)
@@ -287,6 +299,7 @@ def dl_StackedLSTM(X_train, X_test, Y_train, Y_test):
     
 def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
     ts = 4
+    n_features = 10
     
     del [X_train['locale'], X_test['locale']]
     del [X_train['date'], X_test['date']]
@@ -308,8 +321,8 @@ def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
     
     X_train = np.reshape(X_train, X_train.shape+(1,))
     X_test = np.reshape(X_test, X_test.shape+(1,))
-    X_train = X_train.reshape(-1,ts,1,12,1)
-    X_test = X_test.reshape(-1,ts,1,12,1)
+    X_train = X_train.reshape(-1,ts,1,n_features,1)
+    X_test = X_test.reshape(-1,ts,1,n_features,1)
     print(X_train.shape)
     print(X_test.shape)
     
@@ -319,7 +332,7 @@ def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
     print(Y_test.shape)
     
     # Convolution
-    kernel_size = (1,3)
+    kernel_size = (1,2)
     filters = 256
     pool_size = (1,2)
     
@@ -329,31 +342,40 @@ def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
     # batch_size
     batch_size = 32
     
-    rmsprop=optimizers.RMSprop(lr=0.0001)
+    # regularizer
+    reg = L1L2(0.0, 0.001)
+    
+    rmsprop=optimizers.Adam()
+    
+    checkpoint_filepath = os.path.join('model', 'fresh_models', '{0}_CNNLSTM.{1}-{2}.h5'.format('model', '{epoch:02d}', '{val_loss:.7f}'))
+    checkpoint_callback = ModelCheckpoint(checkpoint_filepath, save_best_only=True, verbose=1)
+    early_stopping_callback = EarlyStopping(monitor="val_loss", patience=3, verbose=1)
+    callbacks=[checkpoint_callback]
 
     model=Sequential()
     model.add(TimeDistributed(Conv2D(filters=filters,
                                      kernel_size=kernel_size,
                                      padding='same',
-                                     activation='relu'), input_shape=(ts, 1, 12, 1)))
-    model.add(TimeDistributed(MaxPooling2D(pool_size=pool_size, name="MaxPooling")))
-    model.add(TimeDistributed(Dropout(0.3)))
-    model.add(TimeDistributed(Flatten(name="Flatten")))
+                                     activation='relu'), input_shape=(None, 1, n_features , 1), name="Conv2D"))
+    model.add(TimeDistributed(MaxPooling2D(pool_size=pool_size), name="MaxPooling2D"))
+    model.add(TimeDistributed(Dropout(0.3), name="Dropout_CNN"))
+    model.add(TimeDistributed(Flatten(), name="Flatten"))
     model.add(LSTM(lstm_output_size, return_sequences=True, activation='relu', 
-                   name="LSTM1"))
-    model.add(Dropout(0.3))
+                   name="LSTM1", kernel_initializer="glorot_normal",
+                   kernel_regularizer=reg, bias_regularizer=reg))
     model.add(LSTM(lstm_output_size, return_sequences=True, activation='relu', 
-                   name="LSTM2"))
-    model.add(Dropout(0.3))
+                   name="LSTM2", kernel_initializer="glorot_normal",
+                   kernel_regularizer=reg, bias_regularizer=reg))
     model.add(LSTM(lstm_output_size, activation='relu', 
-                   name="LSTM3"))
-    model.add(Dropout(0.3))
-    model.add(Dense(256, name="FCN1"))
-    model.add(Dense(4, activation='softmax', name="OUTPUT"))
+                   name="LSTM3", kernel_initializer="glorot_normal",
+                   kernel_regularizer=reg, bias_regularizer=reg))
+    model.add(Dense(256, name="FCN1", kernel_initializer="glorot_normal"))
+    model.add(Dense(4, activation='softmax', name="OUTPUT", kernel_initializer="glorot_normal"))
     model.compile(optimizer=rmsprop, loss='categorical_crossentropy',  metrics=['accuracy'])
     model.summary()
     
-    history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(X_test, Y_test), epochs=30)
+    history = model.fit(X_train, Y_train, batch_size=batch_size, validation_data=(X_test, Y_test),
+                        epochs=10)
     loss = history.history['loss']
     val_loss = history.history['val_loss']
     acc = history.history['accuracy']
@@ -368,7 +390,7 @@ def dl_CNNLSTM(X_train, X_test, Y_train, Y_test):
     plt.show()
     
     plt.plot(x_epochs, acc, 'b', label='Training acc')
-    plt.plot(x_epochs, val_acc, 'r', label='Test acc')
+    plt.plot(x_epochs, val_acc, 'r', label='Validation acc')
     plt.title('Accuracy')
     plt.legend()
     plt.show()
@@ -384,24 +406,12 @@ if __name__ == "__main__":
                  'NO2':'float16',
                  'CO':'float16',
                  'SO2':'float16',
-                 'avg_tmp':'float16',
-                 'min_tmp':'float16',
-                 'max_tmp':'float16',
                  'precipitation':'float16',
-                 'max_inst_wind':'float16',
                  'max_inst_wind_direct':'float16',
-                 'max_avg_wind_direct':'float16',
-                 'avg_wind':'float16',
                  'min_humid':'float16',
-                 'avg_humid':'float16',
                  'avg_hPa':'float16',
-                 'avg_total_cloud':'float16',
                  'avg_mid_cloud':'float16',
-                 'avg_gtmp':'float16',
-                 'avg_gtmp5':'float16',
-                 'avg_gtmp10':'float16',
-                 'avg_gtmp150':'float16',
-                 'avg_gtmp300':'float16'}
+                 'avg_gtmp150':'float16'}
 
     df_data = pd.read_csv('data/prep_data.csv', dtype=data_types, engine='c',
                              parse_dates=['date'])
@@ -427,8 +437,6 @@ if __name__ == "__main__":
     vif["features"] = df_data.columns
     
     '''
-    df_data = df_data.drop(['avg_humid','avg_gtmp300','avg_gtmp150','avg_gtmp','min_tmp',
-                            'max_tmp', 'avg_gtmp10', 'avg_gtmp5', 'avg_tmp'], axis=1)
     
     #df_data = df_data[['date','locale','PM10','SO2','CO','NO2','avg_tmp',
     #                   'precipitation','max_inst_wind_direct','avg_wind',
@@ -445,15 +453,23 @@ if __name__ == "__main__":
     # divide X
     X_test = df_data[df_data['date'] > '2016-12-31']
     X_train = df_data[df_data['date'] < '2017-01-01']
-
+    
     gc.collect()
     
-    X_train = X_train.sort_values(['locale', 'date'])
-    X_test = X_test.sort_values(['locale', 'date'])
+    X_train = X_train.sort_values(['date'])
+    X_test = X_test.sort_values(['date'])
     gc.collect()
     
     Y_train = X_train['PM10'].astype(int).to_numpy()
     Y_test = X_test['PM10'].astype(int).to_numpy()
+    
+    unique, counts = np.unique(Y_train, return_counts=True)
+    length = len(Y_train)
+    print(counts / length)
+    
+    unique, counts = np.unique(Y_test, return_counts=True)
+    length = len(Y_test)
+    print(counts / length)
     #ml_linear_regression(X_train, X_test, Y_train, Y_test)
     #ml_logistic_regression(X_train, X_test, Y_train, Y_test)
     #dl_DNN(X_train, X_test, Y_train, Y_test)

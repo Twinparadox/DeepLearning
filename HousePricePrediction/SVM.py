@@ -21,7 +21,11 @@ def load_data(filename, columnName):
     return ts, data
 
 def createSamples(dataset, lookBack, RNN=True):
-
+    samples_df = pd.DataFrame(dataset, columns=['SPI'])
+    for s in range(1, lookBack):
+        samples_df['shift_{}'.format(s)] = samples_df['SPI'].shift(s)
+    print(samples_df.shape)
+    
     dataX, dataY = [], []
     for i in range(len(dataset) - lookBack):
         sample_X = dataset[i:(i + lookBack), :]
@@ -35,6 +39,11 @@ def createSamples(dataset, lookBack, RNN=True):
 
     return dataX, dataY
 
+def makeWindows(data, lookBack):
+    samples_df = data
+    for s in range(1, lookBack):
+        samples_df['shift_{}'.format(s)] = samples_df['SPI'].shift(s)
+
 # divide training and testing, default as 3:1
 def divideTrainTest(dataset, rate=0.75):
 
@@ -46,7 +55,7 @@ def divideTrainTest(dataset, rate=0.75):
 if __name__ == "__main__":
     lookBack = 1
 
-    ts, data = load_data("./data/houseprice.csv", columnName="AATPI")
+    ts, data = load_data("./data/houseprice.csv", columnName="SPI")
     # normalize time series
     scaler = MinMaxScaler(feature_range=(0, 1))
     dataset = scaler.fit_transform(data)

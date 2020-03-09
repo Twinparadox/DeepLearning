@@ -105,13 +105,13 @@ def plot(pred, gtruth, n_features):
 
 
 if __name__ == "__main__":
-    lookBack = 1
+    lookBack = 4
     multiVariate = True
     n_features = 1
-    train_period1 = 128
-    test_period1 = 12
-    train_period2 = 32
-    test_period2 = 12
+    train_period1 = 128-lookBack
+    test_period1 = 12+lookBack
+    train_period2 = 32-lookBack
+    test_period2 = 12+lookBack
     
     epochs = 100
     n_units = [20, 50, 100, 150, 200, 250, 300]
@@ -188,9 +188,8 @@ if __name__ == "__main__":
     model_path = MODEL_SAVE_FOLDER_PATH + 'period1.hdf5'
     cb_checkpoint = ModelCheckpoint(filepath=model_path, monitor='val_loss',
                                     verbose=1, save_best_only=True)
-    
-    # Period1
     '''
+    # Period1
     period1_rmse = []
     period1_mae = []
     for units in n_units:
@@ -274,9 +273,8 @@ if __name__ == "__main__":
         period2_rmse.append(rmse)
         period2_mae.append(mae)
     '''
-    
-    model1 = load_model('model/model_period1_50.hdf5')
-    model2 = load_model('model/model_period2_50.hdf5')
+    model1 = load_model('model/model_period1_100.hdf5')
+    model2 = load_model('model/model_period2_300.hdf5')
     
     Y1_pred = model1.predict(X_test1)
     Y2_pred = model2.predict(X_test2)
@@ -285,6 +283,6 @@ if __name__ == "__main__":
     x_coord = range(train_period1+test_period1)
     
     plt.plot(gtruth,'r')
-    plt.plot(x_coord[train_period1+1:],Y1_pred,'g')
-    plt.plot(x_coord[train_period2+1:train_period2+test_period2],Y2_pred,'g')
-    plt.show() 
+    plt.plot(x_coord[train_period1+lookBack:],Y1_pred,'g')
+    plt.plot(x_coord[train_period2+lookBack:train_period2+test_period2],Y2_pred,'g')
+    plt.show()
