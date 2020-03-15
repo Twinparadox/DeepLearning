@@ -37,14 +37,15 @@ def outliers_z_score(data, threshold=3):
     return np.where(np.abs(z_scores)>threshold, mean, data)
 
 def remove_outlier(data):
-    input_data = data.columns
+    input_data = list(data.columns)
     print(input_data)
     
-    for cols in data:
+    for cols in input_data:
         if cols!='PM10' and cols!='locale':
+            print(data[cols])
             data[cols] = outliers_iqr(data[cols])
 
-    return data    
+    return data
         
 if __name__ == '__main__':
     pd.set_option('display.max_rows', 500)
@@ -128,12 +129,22 @@ if __name__ == '__main__':
     df_result = pd.merge(df_air, df_climate, left_on=['date'], right_index=True, how='left')
     df_result = df_result.reset_index()
     df_result = df_result.sort_values(by=['date'],axis=0)
-    df_result = df_result.set_index('date')
+    
+    df_result = df_result.drop(['day_max_snow', 'day_max_new_snow', 'sun_time', 'sun_sum', 'max_wind',
+                                'avg_hPa_g', 'avg_hPa_o', 'min_hPa_o', 'max_hPa_o',
+                                'max_tmp', 'min_tmp',
+                                'avg_gtmp5', 'avg_gtmp10', 'avg_gtmp50',
+                                'avg_gtmp100', 'avg_gtmp300', 'avg_gtmp', 'min_chosang',
+                                'sun_possible',
+                                'avg_humid', 'avg_dew',
+                                'avg_total_cloud',
+                                'max_inst_wind', 'max_wind_direct'], axis=1)
     
     print(df_result.dtypes)
-    df_result = df_result.fillna(0)
-    
-    print(df_result['avg_humid'].describe())
+    #df_result = df_result.fillna(df_result.mean())
+    fill_mean_func = lambda g: g.fillna(g.mean())
+    df_result = df_result.groupby('date').apply(fill_mean_func)
+    df_result = df_result.set_index('date')
     df_result = remove_outlier(df_result)
     
     #del [df_result['locale']]
@@ -187,16 +198,5 @@ if __name__ == '__main__':
     plt.ylabel('Cumulative explained variance')
     plt.show()
     '''
-    
-    df_result = df_result.drop(['day_max_snow', 'day_max_new_snow', 'sun_time', 'sun_sum', 'max_wind',
-                                'avg_hPa_g', 'avg_hPa_o', 'min_hPa_o', 'max_hPa_o',
-                                'max_tmp', 'min_tmp',
-                                'avg_gtmp5', 'avg_gtmp10', 'avg_gtmp50',
-                                'avg_gtmp100', 'avg_gtmp300', 'avg_gtmp', 'min_chosang',
-                                'sun_possible',
-                                'avg_humid', 'avg_dew',
-                                'avg_total_cloud',
-                                'max_inst_wind', 'max_wind_direct',
-                                'avg_wind'], axis=1)
     
     df_result.to_csv('./data/prep_data.csv', sep=',', na_rep='NaN', encoding='utf-8-sig')
