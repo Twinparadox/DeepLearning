@@ -36,7 +36,7 @@ import os
 import gc
 import matplotlib.pyplot as plt
 
-#from xgboost import XGBClassifier
+from xgboost import XGBClassifier
 scaler = StandardScaler()
 
 def focal_loss_fixed(y_true, y_pred, gamma=2., alpha=.25):
@@ -65,19 +65,19 @@ def f1_m(y_true, y_pred):
 def resampling(df_train):    
     train_freq = df_train['failure'].value_counts()    
     print(train_freq)
-    train_freq_mean = 10000
+    train_freq_mean = train_freq[1]
     
     # Under & Over Sampling store_nbr
     df_list = []
-    target_max = 5
-    multiple = 2
+    target_max = 2
+    multiple = 10
     
     for i in range(0, target_max):
         df_list.append(df_train[df_train['failure']==i])
     
     for i in range(0, target_max):
         if i==0:
-            df_list[i] = df_list[i].sample(n=train_freq_mean*multiple, random_state=123, replace=True)
+            df_list[i] = df_list[i].sample(n=int(train_freq_mean*multiple), random_state=123, replace=True)
         else:
             df_list[i] = df_list[i].sample(n=train_freq_mean, random_state=123, replace=True)
         
@@ -102,10 +102,10 @@ def DNN(train, valid, test):
     
     y_integers = Y_train
     #print(y_integers)
-    class_weights = class_weight.compute_class_weight('balanced', np.unique(y_integers), y_integers)
+    class_weights = class_weight.compute_class_weight(None, np.unique(y_integers), y_integers)
     print(class_weights)
     d_class_weights = dict(enumerate(class_weights)) 
-    #d_class_weights = {0:1.0, 1:1.0, 2:1.0, 3:1.0, 4:1.0}
+    #d_class_weights = {0:1.0, 1:1.0}
     optimizer=optimizers.Adam()
     
     Y_train = to_categorical(Y_train)
@@ -115,25 +115,25 @@ def DNN(train, valid, test):
     model=Sequential()
     model.add(Dense(32, input_dim=19, kernel_initializer='glorot_normal',
                     bias_initializer='glorot_normal', activation='relu'))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.5))
     model.add(Dense(32, kernel_initializer='glorot_normal',
                     bias_initializer='glorot_normal', activation='relu'))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.5))
     model.add(Dense(32, kernel_initializer='glorot_normal',
                     bias_initializer='glorot_normal',  activation='relu'))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.5))
     model.add(Dense(32, kernel_initializer='glorot_normal',
                     bias_initializer='glorot_normal',  activation='relu'))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.5))
     model.add(BatchNormalization())
     model.add(Dense(32, kernel_initializer='glorot_normal',
                     bias_initializer='glorot_normal',  activation='relu'))
-    model.add(Dropout(0.2))
+    model.add(Dropout(0.5))
     model.add(Dense(32, kernel_initializer='glorot_normal',
                     bias_initializer='glorot_normal',  activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(5, activation='softmax'))
-    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy', f1_m])
+    model.add(Dropout(0.5))
+    model.add(Dense(2, activation='sigmoid'))
+    model.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['accuracy', f1_m])
     model.summary()
 
     history = model.fit(X_train, Y_train, batch_size=1000, epochs=100,
@@ -160,10 +160,56 @@ def DNN(train, valid, test):
     #Y_pred = np.argmax(Y_pred, axis=1).reshape(-1,1)
     #Y_test = np.argmax(Y_test, axis=1).reshape(-1,1)
     print(confusion_matrix(Y_test, Y_pred))
-    print(classification_report(Y_test, Y_pred, labels=[0, 1, 2, 3, 4]))
+    print(classification_report(Y_test, Y_pred, labels=[0, 1]))
     
 def XGBClss(train, valid, test):
-    pass
+    X_train = train.drop(['datetime', 'failure'], axis=1)
+    X_valid = valid.drop(['datetime', 'failure'], axis=1)
+    X_test = test.drop(['datetime', 'failure'], axis=1)
+    gc.collect()
+    
+    X_train = scaler.fit_transform(X_train)
+    X_valid = scaler.fit_transform(X_valid)
+    X_test = scaler.fit_transform(X_test)
+    
+    Y_train = train['failure']
+    Y_valid = valid['failure']
+    Y_test = test['failure']
+    
+    y_integers = Y_train
+    #print(y_integers)
+    class_weights = class_weight.compute_class_weight('balanced', np.unique(y_integers), y_integers)
+    print(class_weights)
+    d_class_weights = dict(enumerate(class_weights)) 
+    
+    clf = XGBClassifier()
+    parameters = {
+            "n_estimator" : [100, 200, 300],
+            "max_depth" : [ 3, 4, 5 ],
+            "tree_method" : ['gpu_hist'],
+            "predictor" : ['gpu_predictor']
+     }
+
+    grid = GridSearchCV(clf,
+                        parameters, n_jobs=1,
+                        scoring="f1_micro",
+                        cv=3)
+    
+    grid.fit(X_train, Y_train)
+    
+    print(grid.best_score_)
+    print(grid.best_params_)
+    
+    model = grid.best_estimator_
+    model.fit(X_train, Y_train)
+    
+    Y_pred = model.predict(X_test)
+    
+    print(confusion_matrix(Y_test, Y_pred))
+    print(classification_report(Y_test, Y_pred, labels=[0, 1, 2, 3, 4]))
+    
+    
+
 
 if __name__=="__main__":
     data_type={'machineID':'uint8',
@@ -198,10 +244,7 @@ if __name__=="__main__":
     test_results = []
     models = []
     
-    df_data['failure']=np.where(df_data['failure']=='none',0,
-                                np.where(df_data['failure']=='comp1',1,
-                                         np.where(df_data['failure']=='comp2',2,
-                                                  np.where(df_data['failure']=='comp3',3,4))))
+    df_data['failure']=np.where(df_data['failure']=='none',0,1)
     df_data['failure']=df_data['failure'].astype('int')
     
     del df_data['machineID']
@@ -223,3 +266,4 @@ if __name__=="__main__":
     #train_data = resampling(train_data)
     
     DNN(train_data, validation_data, test_data)
+    #XGBClss(train_data, validation_data, test_data)

@@ -142,8 +142,9 @@ if __name__ == '__main__':
     
     print(df_result.dtypes)
     #df_result = df_result.fillna(df_result.mean())
-    fill_mean_func = lambda g: g.fillna(g.mean())
-    df_result = df_result.groupby('date').apply(fill_mean_func)
+    #fill_mean_func = lambda g: g.fillna(g.mean())
+    #df_result = df_result.groupby('date').apply(fill_mean_func)
+    df_result = df_result.fillna(0)
     df_result = df_result.set_index('date')
     df_result = remove_outlier(df_result)
     
