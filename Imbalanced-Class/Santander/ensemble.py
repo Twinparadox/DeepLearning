@@ -19,7 +19,7 @@ import statsmodels.api as sm
 # TAKE FROM YAG320'S KERNEL
 # https://www.kaggle.com/yag320/list-of-fake-samples-and-public-private-lb-split
 
-test_path = '../input/test.csv'
+test_path = 'data/test.csv'
 
 df_test = pd.read_csv(test_path)
 df_test.drop(['ID_code'], axis=1, inplace=True)
@@ -45,8 +45,8 @@ for i in range(200): d['var_'+str(i)] = 'float32'
 d['target'] = 'uint8'
 d['ID_code'] = 'object'
 
-train = pd.read_csv('../input/train.csv', dtype=d)
-test = pd.read_csv('../input/test.csv', dtype=d)
+train = pd.read_csv('data/train.csv', dtype=d)
+test = pd.read_csv('data/test.csv', dtype=d)
 
 print('Loaded',len(train),'rows of train')
 print('Loaded',len(test),'rows of test')
@@ -81,7 +81,10 @@ param = {
     'feature_fraction': 1.0,
     'max_depth': -1,
     'objective': 'binary',
-    'verbosity': -10}
+    'verbosity': -10,
+    'device':'gpu',
+    'gpu_platform_id':0,
+    'gpu_device_id':0}
 train2 = train.sample(frac=1,random_state=42)
 evals_result = {}
 num_vars = 200
