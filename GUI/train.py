@@ -20,7 +20,8 @@ def train(data):
     model.add(Dense(1))
     model.compile(loss='mean_squared_error', optimizer='adam')
     model.summary()
-    history=model.fit(X_train, Y_train, validation_data=(X_validation, Y_validation) ,epochs=200, batch_size=100)
+    history=model.fit(X_train, Y_train, validation_data=(X_validation, Y_validation)
+                      ,epochs=200, batch_size=100)
 
     train_loss = history.history['loss']
     val_loss = history.history['val_loss']
@@ -38,3 +39,4 @@ def train(data):
 if __name__ == "__main__":
     df = pd.read_csv('data.csv', engine='c')
     train(df)
+    
