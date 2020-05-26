@@ -60,6 +60,13 @@ df_total = df_total.dropna()
 
 df_total[df_total[DPQ] < 1] = 0
 df_total[df_total[DPQ] > 3] = np.nan
+df_total[df_total[INQ] >= 77] = np.nan
+df_total[INQ] = df_total[INQ] - 1
+df_total['DPQ_total'] = df_total[DPQ].sum(axis=1)
+df_total['DPQ_range'] = np.where(df_total['DPQ_total'] >= 20, 3,
+                                 np.where(df_total['DPQ_total'] >= 10, 2, 
+                                          np.where(df_total['DPQ_total'] >= 5, 1, 0)))
+df_total['DPQ_OHE'] = np.where(df_total['DPQ_total'] >= 10, 1, 0)
 
 df_total = df_total.dropna()
 
