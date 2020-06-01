@@ -7,8 +7,8 @@ Created on Tue May 26 10:55:21 2020
 import numpy as np
 import pandas as pd
 
-dir_name = '2009-2010'
-init = 'F'
+dir_name = '2007-2008'
+init = 'E'
 
 df_CBC = pd.read_sas(dir_name+'/CBC_'+init+'.XPT', index='SEQN')
 df_BMX = pd.read_sas(dir_name+'/BMX_'+init+'.XPT', index='SEQN')
@@ -33,7 +33,7 @@ INQ_S = ['INQ020', 'INQ012', 'INQ030', 'INQ060', 'INQ080', 'INQ090', 'INQ132',
        'INQ140', 'INQ150']
 DPQ = ['DPQ010', 'DPQ020', 'DPQ030', 'DPQ040', 'DPQ050', 'DPQ060', 'DPQ070',
        'DPQ080', 'DPQ090']
-DEMO = ['RIAGENDR', 'DMDEDUC2', 'DMDEDUC3', 'DMDMARTL']
+DEMO = ['RIAGENDR', 'DMDEDUC2', 'DMDEDUC3', 'DMDMARTL', 'RIDRETH1']
 
 NUMERIC = ['LBXTC', 'LBDTCSI', 'LBDHDD', 'LBDHDDSI', 'LBXGH', 'LBDLDL', 'LBDLDLSI',
            'LBXWBCSI', 'LBXHGB', 'LBXMCHSI', 'LBXMC', 'BMXWT', 'BMXHT', 'BMXBMI',

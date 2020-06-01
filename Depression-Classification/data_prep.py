@@ -37,6 +37,7 @@ from sklearn.ensemble import VotingClassifier
 
 import tensorflow as tf
 from xgboost import XGBClassifier
+import lightgbm as lgb
 
 scaler = MinMaxScaler()
 
@@ -46,14 +47,14 @@ INQ = ['INQ020', 'INQ012', 'INQ030', 'INQ060', 'INQ080', 'INQ090', 'INQ132',
 DPQ = ['DPQ010', 'DPQ020', 'DPQ030', 'DPQ040', 'DPQ050', 'DPQ060', 'DPQ070',
        'DPQ080', 'DPQ090']
 DPQ_RA = ['DPQ_range']
-DEMO = ['DMDEDUC', 'DMDMARTL', 'RIDRETH1']
+DEMO = ['DMDEDUC', 'RIAGENDR', 'DMDMARTL', 'RIDRETH1']
 target = ['DPQ_OHE']
 column_list = DEMO+INQ
 
 
 NUMERIC = ['LBXTC', 'LBDTCSI', 'LBDHDD', 'LBDHDDSI', 'LBXGH', 'LBDLDL', 'LBDLDLSI',
            'LBXWBCSI', 'LBXHGB', 'LBXMCHSI', 'LBXMC', 'BMXWT', 'BMXHT', 'BMXBMI',
-           'BPXPLS', 'BPXDI', 'LBXVD2MS', 'LBXVD3MS']
+           'BPXPLS', 'BPXDI', 'LBXVD2MS', 'LBXVD3MS', 'BPXSY', 'RIDAGEYR']
 
 REMOVED = ['BPXSY', 'RIDAGEYR']
 
@@ -92,7 +93,7 @@ def resampling(df_data, ratio):
     return pd.DataFrame(df_sampling_train)
     '''
 
-def DNN(df_data):    
+def CNN(df_data):    
     Y = df_data['DPQ_OHE']
     X = df_data.drop(['DPQ_OHE'], axis=1)
     
@@ -130,8 +131,8 @@ def DNN(df_data):
     print(Y_train.value_counts())
     print(Y_test.value_counts())
     
-    Y_train = to_categorical(Y_train)
-    Y_test = to_categorical(Y_test)  
+    #Y_train = to_categorical(Y_train)
+    #Y_test = to_categorical(Y_test)  
     
     adam=optimizers.Adam(lr=0.001, decay=0.000001)
     kernel_size=5
@@ -139,11 +140,13 @@ def DNN(df_data):
     model = Sequential()
     model.add(Conv1D(64, input_shape=X_train.shape[1:3], kernel_size=kernel_size,
                      activation='relu', kernel_initializer='he_uniform' ,name='Conv1'))
+    model.add(Conv1D(32, kernel_size=kernel_size,
+                     activation='relu', kernel_initializer='he_uniform', name='Conv2'))
     model.add(BatchNormalization())
     model.add(Flatten(name='Flatten'))
     model.add(Dropout(0.8))
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform', name='FCN1'))
-    model.add(Dense(Y_train.shape[1], activation='softmax'))
+    model.add(Dense(1, activation='sigmoid'))
     model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC()])
     model.summary()
 
@@ -170,8 +173,13 @@ def DNN(df_data):
     plt.show()
     
     Y_pred = model.predict(X_test)
-    Y_pred = np.argmax(Y_pred, axis=1)
-    Y_test = np.argmax(Y_test, axis=1)
+    
+    #print(tf.keras.metrics.AUC(Y_test, Y_pred))
+    print(roc_auc_score(Y_test, Y_pred))
+    
+    #Y_pred = np.argmax(Y_pred, axis=1)
+    #Y_test = np.argmax(Y_test, axis=1)
+    Y_pred = np.where(Y_pred>=0.5, 1, 0)
     
     print(confusion_matrix(Y_test, Y_pred))
     print(classification_report(Y_test, Y_pred, labels=[0, 1]))
@@ -209,17 +217,17 @@ def CNN2D(df_data):
     X_train = np.hstack([x_train, x_train_oh])
     X_test = np.hstack([x_test, x_test_oh])
     
-    X_train = X_train.reshape(X_train.shape[0], 5, 13, 1)
-    X_test = X_test.reshape(X_test.shape[0], 5, 13, 1)
+    X_train = X_train.reshape(X_train.shape[0], 23, 3, 1)
+    X_test = X_test.reshape(X_test.shape[0], 23, 3, 1)
     print(X_train.shape)
     
     print(Y_train.value_counts())
     print(Y_test.value_counts())
     
-    Y_train = to_categorical(Y_train)
-    Y_test = to_categorical(Y_test)  
+    #Y_train = to_categorical(Y_train)
+    #Y_test = to_categorical(Y_test)  
     
-    adam=optimizers.Adam(lr=0.001, decay=0.00005)
+    adam=optimizers.Adam(lr=0.001)
     kernel_size = (3, 3)
     strides = (1, 1)
     
@@ -227,18 +235,16 @@ def CNN2D(df_data):
     model.add(Conv2D(32, input_shape=X_train.shape[1:4],
                      kernel_size=kernel_size, strides=strides,
                      activation='relu', kernel_initializer='he_uniform', name='Conv1')) 
-    model.add(Conv2D(16,
-                     kernel_size=kernel_size, strides=strides,
-                     activation='relu', kernel_initializer='he_uniform', name='Conv2')) 
     model.add(Flatten(name='Flatten'))
     model.add(Dropout(0.8))
-    model.add(Dense(Y_train.shape[1], activation='softmax'))
+    model.add(Dense(128, activation='relu', kernel_initializer='he_uniform', name='FCN1'))
+    model.add(Dense(1, activation='sigmoid'))
     model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['accuracy', tf.keras.metrics.AUC()])
     model.summary()
 
     history = model.fit(X_train, Y_train, 
                         validation_data=(X_test, Y_test),
-                        batch_size=100, epochs=25, verbose=1)
+                        batch_size=100, epochs=35, verbose=1)
     loss = history.history['loss']
     val_loss = history.history['val_loss']
     acc = history.history['accuracy']
@@ -258,11 +264,14 @@ def CNN2D(df_data):
     plt.legend()
     plt.show()
 
-    score = model.evaluate(X_test, Y_test, batch_size=1000)
-    
     Y_pred = model.predict(X_test)
-    Y_pred = np.argmax(Y_pred, axis=1)
-    Y_test = np.argmax(Y_test, axis=1)
+    
+    #print(tf.keras.metrics.AUC(Y_test, Y_pred))
+    print(roc_auc_score(Y_test, Y_pred))
+    
+    #Y_pred = np.argmax(Y_pred, axis=1)
+    #Y_test = np.argmax(Y_test, axis=1)
+    Y_pred = np.where(Y_pred>=0.5, 1, 0)
     
     print(confusion_matrix(Y_test, Y_pred))
     print(classification_report(Y_test, Y_pred, labels=[0, 1]))
@@ -380,19 +389,19 @@ def cnn_model3():
     return model
 
 def dnn_model1():    
-    adam=optimizers.Adam(lr=0.01, decay=0.000001)
+    adam=optimizers.Adam(lr=0.001)
     model = Sequential()
     model.add(Dense(128, input_dim=65, activation='relu', kernel_initializer='he_uniform'))
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
     model.add(Dropout(0.8))
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
-    model.add(Dense(1, activation='sigmoid'))
+    model.add(Dense(1, activation='softmax'))
     model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['accuracy'])
     
     return model
     
 def dnn_model2():
-    adam=optimizers.Adam(lr=0.01, decay=0.000001)
+    adam=optimizers.Adam(lr=0.001)
     model = Sequential()
     model.add(Dense(128, input_dim=65, activation='relu', kernel_initializer='he_uniform'))
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
@@ -400,13 +409,13 @@ def dnn_model2():
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
     model.add(Dropout(0.8))
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
-    model.add(Dense(1, activation='sigmoid'))
+    model.add(Dense(1, activation='softmax'))
     model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['accuracy'])
     
     return model
     
 def dnn_model3():
-    adam=optimizers.Adam(lr=0.01, decay=0.000001)
+    adam=optimizers.Adam(lr=0.001)
     model = Sequential()
     model.add(Dense(128, input_dim=65, activation='relu', kernel_initializer='he_uniform'))
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
@@ -416,7 +425,7 @@ def dnn_model3():
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
     model.add(Dropout(0.8))
     model.add(Dense(128, activation='relu', kernel_initializer='he_uniform'))
-    model.add(Dense(1, activation='sigmoid'))
+    model.add(Dense(1, activation='softmax'))
     model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['accuracy'])
     
     return model
@@ -463,14 +472,106 @@ def Ensemble(df_data):
     #Y_test = to_categorical(Y_test)  
     
     model1 = KerasClassifier(build_fn = cnn_model1, epochs = 50)
-    model2 = KerasClassifier(build_fn = cnn_model2, epochs = 60)
-    model3 = KerasClassifier(build_fn = cnn_model3, epochs = 70)
+    model2 = KerasClassifier(build_fn = cnn_model2, epochs = 50)
+    model3 = KerasClassifier(build_fn = cnn_model3, epochs = 50)
+    model4 = KerasClassifier(build_fn = dnn_model1, epochs = 50)
+    model5 = KerasClassifier(build_fn = dnn_model2, epochs = 50)
     
-    ensemble_clf = VotingClassifier(estimators = [('model1', model1), ('model2', model2), ('model3', model3)], voting = 'soft')
+    ensemble_clf = VotingClassifier(estimators = [('model1', model1), ('model2', model2), ('model3', model3), ('model4', model4), ('model5', model5)], voting = 'soft')
     ensemble_clf.fit(X_train, Y_train)
     
     Y_pred = ensemble_clf.predict(X_test)
     
+    print(confusion_matrix(Y_test, Y_pred))
+    print(classification_report(Y_test, Y_pred, labels=[0, 1]))
+    print(roc_auc_score(Y_test, Y_pred))
+    
+def LGBM(df_data):    
+    Y = df_data['DPQ_OHE']
+    X = df_data.drop(['DPQ_OHE'], axis=1)
+    
+    X_train, X_test, Y_train, Y_test = train_test_split(X,Y,test_size=0.2,
+                                                        random_state = 42,
+                                                        stratify = Y)
+    
+    X_columns = X.columns
+    Y_columns = ['DPQ_OHE']
+    
+    X_train = pd.DataFrame(X_train, columns=X_columns)
+    Y_train = pd.DataFrame(Y_train, columns=Y_columns)
+    print(X_train.describe())
+    X_train = pd.concat([X_train, Y_train], axis=1)
+    print(X_train.shape)
+    
+    X_train = resampling(X_train, 1)
+    print(X_train.shape)
+    Y_train = X_train['DPQ_OHE']
+    X_train = X_train.drop('DPQ_OHE', axis=1)
+    
+    x_train = scaler.fit_transform(X_train[NUMERIC])
+    x_test = scaler.transform(X_test[NUMERIC])
+    
+    x_train_oh = np.array(X_train.drop(NUMERIC, axis=1))
+    x_test_oh = np.array(X_test.drop(NUMERIC, axis=1))  
+    
+    X_train = np.hstack([x_train, x_train_oh])
+    X_test = np.hstack([x_test, x_test_oh])
+    print(X_train.shape)
+    
+    print(Y_train.value_counts())
+    print(Y_test.value_counts())
+    
+    model = lgb.LGBMClassifier(learning_rate=0.001, n_estimators=10000, boosting_type='gbdt',
+                               metric='binary', feature_faction = 1, scale_pos_weight=1)
+    
+    param_grid = {'n_estimators':[100, 150, 200, 250, 300], 'learning_rate':[0.0001, 0.001, 0.01],
+                      'boosting_type':['gbdt', 'dart'], 'objective':['binary'],
+                      'subsample':[0.7, 0.75, 0.8]}
+    
+
+    grid = GridSearchCV(estimator=model,
+                        param_grid=param_grid,
+                        scoring='roc_auc',
+                        n_jobs=1,
+                        cv=5,
+                        refit=True,
+                        return_train_score=True)
+    
+    grid.fit(X_train, Y_train)
+    
+    params = {
+        'application': 'binary', # for binary classification
+    #     'num_class' : 1, # used for multi-classes
+        'boosting': 'gbdt', # traditional gradient boosting decision tree
+        'learning_rate': 0.05,
+        'device': 'cpu', # you can use GPU to achieve faster learning
+        'max_depth': -1, # <0 means no limit
+        'metric' : 'auc',
+        'subsample_for_bin': 200, # number of samples for constructing bins
+        'colsample_bytree': 0.8, # subsample ratio of columns when constructing the tree
+    }
+    
+    params['learning_rate'] = grid.best_params_['learning_rate']
+    params['subsample'] = grid.best_params_['subsample']
+    params['n_estimators'] = grid.best_params_['n_estimators']
+    params['boosting_type'] = grid.best_params_['boosting_type']
+
+    print(grid.best_params_)
+    d_train = lgb.Dataset(X_train, label=Y_train)
+    d_valid = lgb.Dataset(X_test, label=Y_test) 
+
+    watchlist = [d_train, d_valid]
+
+
+    model = lgb.train(params, train_set=d_train,
+                      valid_sets=watchlist, verbose_eval=4)
+    
+    Y_pred = model.predict(X_test)
+    print(Y_pred)
+    print(roc_auc_score(Y_test, Y_pred))
+    
+    Y_pred = np.where(Y_pred>=0.55, 1, 0)
+    print(accuracy_score(Y_test, Y_pred))
     print(confusion_matrix(Y_test, Y_pred))
     print(classification_report(Y_test, Y_pred, labels=[0, 1]))
     print(roc_auc_score(Y_test, Y_pred))
@@ -491,8 +592,9 @@ if __name__ == "__main__":
     print(df_data.shape)
     df_data = df_data.drop(['DPQ_total'], axis=1)
     df_data = df_data.drop(['DPQ_range'], axis=1)
-    df_data = df_data.drop(['RIAGENDR'], axis=1)
-    df_data = df_data.drop(['BPXSY', 'RIDAGEYR'], axis=1)
+    #df_data = df_data.drop(['RIAGENDR'], axis=1)
+    #df_data = df_data.drop(['BPXSY', 'RIDAGEYR'], axis=1)
+    #df_data = df_data.drop(['DMDMARTL', 'RIDRETH1'], axis=1)
     #df_data = df_data.drop(['LBXVD2MS', 'LBXVD3MS'], axis=1)
     df_data = df_data.drop(DPQ, axis=1)
     df_data[column_list] = df_data[column_list].astype(int)
@@ -506,7 +608,8 @@ if __name__ == "__main__":
     #df_data = pd.get_dummies(df_data, columns=column_list)
     #print(df_data.shape)
     
-    #DNN(df_data)
+    #CNN(df_data)
     #XGBBest(df_data)
     #CNN2D(df_data)
-    Ensemble(df_data)
+    #Ensemble(df_data)
+    LGBM(df_data)
