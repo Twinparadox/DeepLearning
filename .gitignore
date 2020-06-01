@@ -4,4 +4,4 @@
 *.xml
 *.xls
 *.xlsx
-./Depression-Classification/data_prep.py
+Depression-Classification/data_prep.py
