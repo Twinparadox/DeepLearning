@@ -23,7 +23,7 @@ df_GHB = pd.read_sas(dir_name+'/GHB_'+init+'.XPT', index='SEQN')
 df_VID = pd.read_sas(dir_name+'/VID_'+init+'.XPT', index='SEQN')
 
 df_total = pd.concat([df_DEMO, df_BMX, df_BPX, df_CBC, df_HDL,
-                      df_TCHOL, df_TRIGLY, df_GHB, df_INQ, df_VID, df_DPQ], axis=1, join='inner')
+                      df_TCHOL, df_TRIGLY, df_GHB, df_VID, df_INQ, df_DPQ], axis=1, join='inner')
 
 
 INQ = ['INQ020', 'INQ012', 'INQ030', 'INQ060', 'INQ080', 'INQ090', 'INQ132',
@@ -42,7 +42,7 @@ BP_SY = ['BPXSY1', 'BPXSY2', 'BPXSY3', 'BPXSY4']
 BP_DI = ['BPXDI1', 'BPXDI2', 'BPXDI3', 'BPXDI4']
 
 total_list = NUMERIC+INQ+DPQ+DEMO
-print(df_total.isnull().sum())
+#print(df_total.isnull().sum())
 df_HR = df_total[total_list].dropna()
 df_BSY = df_total[BP_SY]
 df_BDI = df_total[BP_DI]
@@ -59,7 +59,7 @@ df_BDI = np.array(df_BDI.mean(axis=1))
 df_total = df_total[total_list]
 df_total['BPXSY'] = df_BSY
 df_total['BPXDI'] = df_BDI
-print(df_total.isnull().sum())
+#print(df_total.isnull().sum())
 
 df_tot = df_total
 
@@ -106,4 +106,6 @@ df_total['DPQ_OHE'] = np.where(df_total['DPQ_total'] >= 10, 1, 0)
 df_total = df_total.dropna()
 
 df_total.to_csv(dir_name+'.csv')
+
+print(df_DEMO.isnull().sum())
 
