@@ -8,11 +8,8 @@ NMS_THRESHOLD = 0.4
 COLORS = [(0, 255, 255), (255, 255, 0), (0, 255, 0), (255, 0, 0)]
 
 class_names = []
-with open("origin_classes.txt", "r") as f:
+with open("classes.txt", "r") as f:
     class_names = [cname.strip() for cname in f.readlines()]
-
-vc = cv2.VideoCapture("data/test1.mp4")
-vc2 = cv2.VideoCapture("data/test2.mp4")
 
 vc_list = [cv2.VideoCapture("data/test11.mp4"), cv2.VideoCapture("data/test12.mp4"), cv2.VideoCapture("data/test13.mp4"),
            cv2.VideoCapture("data/test21.mp4"), cv2.VideoCapture("data/test22.mp4"), cv2.VideoCapture("data/test23.mp4"),
@@ -22,7 +19,7 @@ vc_list = [cv2.VideoCapture("data/test11.mp4"), cv2.VideoCapture("data/test12.mp
 model_list = []
 for idx in range(9):
     #net = cv2.dnn.readNet(f"data/yolo-obj_final.weights", "data/yolo-obj.cfg")
-    net = cv2.dnn.readNet(f"data/yolov4-tiny.weights", "data/yolov4-tiny.cfg")
+    net = cv2.dnn.readNet(f"data/yolov4-tiny_final.weights", "data/yolov4-tiny_final.cfg")
     net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
     net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
@@ -59,7 +56,7 @@ while cv2.waitKey(1) < 1:
 
         total_time += end - start
         total_draw += end_drawing - start_drawing
-        frame = cv2.resize(frame, dsize=(480, 360), interpolation=cv2.INTER_AREA)
+        frame = cv2.resize(frame, dsize=(480, 360), interpolation=cv2.INTER_LINEAR)
         frame_list.append(frame)
 
         idx += 1
